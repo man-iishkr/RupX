@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance - RupX</title>
+    <link rel="stylesheet" href="dashboard-styles.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">RupX</span>
+            </div>
+            <div class="sidebar-menu">
+                <a href="projects.html" class="menu-item">
+                    <span>📁</span> Projects
+                </a>
+                <a href="upload.html" class="menu-item">
+                    <span>📤</span> Upload Dataset
+                </a>
+                <a href="train.html" class="menu-item">
+                    <span>🧠</span> Train Model
+                </a>
+                <a href="test.html" class="menu-item">
+                    <span>🎥</span> Test Recognition
+                </a>
+                <a href="attendance.html" class="menu-item active">
+                    <span>📊</span> Attendance
+                </a>
+            </div>
+            <div class="sidebar-footer">
+                <button onclick="logout()" class="btn-logout">Logout</button>
+            </div>
+        </nav>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Attendance Records</h1>
+                <button onclick="downloadAttendance()" class="btn-primary">
+                    📥 Download Excel
+                </button>
+            </header>
+            
+            <div id="attendance-stats" class="stats-grid">
+                <!-- Stats will be loaded here -->
+            </div>
+            
+            <div id="today-attendance" style="margin-top: 2rem;">
+                <h2 style="margin-bottom: 1rem;">Today's Attendance</h2>
+                <div id="today-list" class="attendance-list">
+                    <!-- Today's list will be loaded here -->
+                </div>
+            </div>
+            
+            <div id="no-data-message" style="display: none; text-align: center; padding: 4rem; color: var(--text-secondary);">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">📊</div>
+                <h3>No Attendance Data</h3>
+                <p>Start recognition to begin tracking attendance</p>
+                <a href="test.html" class="btn-primary" style="margin-top: 1rem; display: inline-block;">Go to Recognition</a>
+            </div>
+        </main>
+    </div>
+    
+    <script src="dashboard.js"></script>
+    <script src="attendance.js"></script>
+</body>
+</html>

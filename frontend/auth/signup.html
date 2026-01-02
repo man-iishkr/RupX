@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - RupX</title>
+    <link rel="stylesheet" href="auth-style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-left">
+            <div class="auth-brand">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">RupX</span>
+            </div>
+            <h1>Create your account</h1>
+            <p>Start tracking attendance with AI-powered face recognition</p>
+            
+            <form id="signup-form" class="auth-form">
+                <div class="form-group">
+                    <label for="email">Email address</label>
+                    <input type="email" id="email" name="email" required placeholder="you@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Minimum 8 characters">
+                    <span class="form-hint">Must be at least 8 characters</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm-password">Confirm Password</label>
+                    <input type="password" id="confirm-password" name="confirm-password" required placeholder="Re-enter password">
+                </div>
+                
+                <div id="error-message" class="error-message"></div>
+                
+                <button type="submit" class="btn-submit">Create Account</button>
+            </form>
+            
+            <div class="auth-footer">
+                Already have an account? <a href="login.html">Sign in</a>
+            </div>
+        </div>
+        
+        <div class="auth-right">
+            <div class="auth-visual">
+                <div class="visual-circle"></div>
+                <div class="visual-card">
+                    <div class="card-icon">🎯</div>
+                    <h3>99.8% Accuracy</h3>
+                    <p>State-of-the-art face recognition powered by ArcFace technology</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="auth.js"></script>
+</body>
+</html>

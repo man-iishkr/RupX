@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Recognition - RupX</title>
+    <link rel="stylesheet" href="dashboard-styles.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">RupX</span>
+            </div>
+            <div class="sidebar-menu">
+                <a href="projects.html" class="menu-item">
+                    <span>📁</span> Projects
+                </a>
+                <a href="upload.html" class="menu-item">
+                    <span>📤</span> Upload Dataset
+                </a>
+                <a href="train.html" class="menu-item">
+                    <span>🧠</span> Train Model
+                </a>
+                <a href="test.html" class="menu-item active">
+                    <span>🎥</span> Test Recognition
+                </a>
+                <a href="attendance.html" class="menu-item">
+                    <span>📊</span> Attendance
+                </a>
+            </div>
+            <div class="sidebar-footer">
+                <button onclick="logout()" class="btn-logout">Logout</button>
+            </div>
+        </nav>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Test Face Recognition</h1>
+            </header>
+            
+            <div id="not-trained-message" style="display: none;">
+                <div class="alert alert-warning">
+                    <span>⚠</span>
+                    <div>
+                        <strong>Model Not Trained</strong>
+                        <p>Please train your model before testing recognition.</p>
+                        <a href="train.html" class="btn-primary" style="margin-top: 1rem; display: inline-block;">Go to Training</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="recognition-container" style="display: none;">
+                <div class="video-container">
+                    <video id="webcam" autoplay playsinline></video>
+                    <canvas id="overlay" class="video-overlay"></canvas>
+                </div>
+                
+                <div class="video-controls">
+                    <button id="start-btn" class="btn-success" onclick="startRecognition()">
+                        ▶ Start Recognition
+                    </button>
+                    <button id="stop-btn" class="btn-danger" onclick="stopRecognition()" style="display: none;">
+                        ⏸ Stop Recognition
+                    </button>
+                </div>
+                
+                <div class="attendance-list">
+                    <h3>✅ Marked Today</h3>
+                    <div id="marked-list">
+                        <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No one marked yet</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="dashboard.js"></script>
+    <script src="test.js"></script>
+</body>
+</html>

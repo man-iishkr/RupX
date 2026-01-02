@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Model - RupX</title>
+    <link rel="stylesheet" href="dashboard-styles.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">RupX</span>
+            </div>
+            <div class="sidebar-menu">
+                <a href="projects.html" class="menu-item">
+                    <span>📁</span> Projects
+                </a>
+                <a href="upload.html" class="menu-item">
+                    <span>📤</span> Upload Dataset
+                </a>
+                <a href="train.html" class="menu-item active">
+                    <span>🧠</span> Train Model
+                </a>
+                <a href="test.html" class="menu-item">
+                    <span>🎥</span> Test Recognition
+                </a>
+                <a href="attendance.html" class="menu-item">
+                    <span>📊</span> Attendance
+                </a>
+            </div>
+            <div class="sidebar-footer">
+                <button onclick="logout()" class="btn-logout">Logout</button>
+            </div>
+        </nav>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Train Face Recognition Model</h1>
+            </header>
+            
+            <div id="model-status-card" class="stats-grid" style="max-width: 800px;">
+                <!-- Status will be loaded here -->
+            </div>
+            
+            <div id="training-controls" style="max-width: 800px; margin-top: 2rem;">
+                <button id="train-btn" class="btn-primary" onclick="startTraining()" style="display: none;">
+                    🚀 Start Training
+                </button>
+            </div>
+            
+            <div id="training-progress" class="progress-container" style="display: none; max-width: 800px;">
+                <h3 id="progress-title">Training in Progress...</h3>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="progress-text" class="progress-text">0%</div>
+            </div>
+            
+            <div id="training-stats" class="stats-grid" style="display: none; max-width: 800px; margin-top: 2rem;">
+                <!-- Training stats will appear here -->
+            </div>
+            
+            <div id="model-metrics" style="display: none; max-width: 800px; margin-top: 2rem;">
+                <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem;">
+                    <h3 style="margin-bottom: 1.5rem;">📊 Model Performance Metrics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Model Accuracy</div>
+                            <div class="stat-value" id="metric-accuracy">--</div>
+                            <div class="stat-sublabel">Based on embedding similarity</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Precision</div>
+                            <div class="stat-value" id="metric-precision">--</div>
+                            <div class="stat-sublabel">True positive rate</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Intra-Class Similarity</div>
+                            <div class="stat-value" id="metric-intra">--</div>
+                            <div class="stat-sublabel">Same person consistency</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Inter-Class Distance</div>
+                            <div class="stat-value" id="metric-inter">--</div>
+                            <div class="stat-sublabel">Different person separation</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-dark); border-radius: 8px; color: var(--text-secondary); font-size: 0.875rem;">
+                        <strong style="color: var(--text-primary);">Note:</strong> These metrics are calculated from actual embedding analysis, not hardcoded. 
+                        High intra-class similarity (>0.7) and high inter-class distance (>0.5) indicate excellent model performance.
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="dashboard.js"></script>
+    <script src="train.js"></script>
+</body>
+</html>

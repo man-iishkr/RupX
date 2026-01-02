@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - RupX</title>
+    <link rel="stylesheet" href="auth-style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-left">
+            <div class="auth-brand">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">RupX</span>
+            </div>
+            <h1>Welcome back</h1>
+            <p>Sign in to your RupX account</p>
+            
+            <form id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label for="email">Email address</label>
+                    <input type="email" id="email" name="email" required placeholder="you@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+                
+                <div id="error-message" class="error-message"></div>
+                
+                <button type="submit" class="btn-submit">Sign In</button>
+            </form>
+            
+            <div class="auth-footer">
+                Don't have an account? <a href="signup.html">Sign up</a>
+            </div>
+        </div>
+        
+        <div class="auth-right">
+            <div class="auth-visual">
+                <div class="visual-circle"></div>
+                <div class="visual-card">
+                    <div class="card-icon">⚡</div>
+                    <h3>Real-Time Recognition</h3>
+                    <p>Instant face detection via browser webcam with optimized performance</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="auth.js"></script>
+</body>
+</html>

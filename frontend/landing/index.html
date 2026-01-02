@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RupX - Train. Recognize. Track.</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Custom Cursor -->
+    <div class="cursor"></div>
+    <div class="cursor-follower"></div>
+
+    <!-- 3D Background Canvas -->
+    <canvas id="three-canvas"></canvas>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">RupX</span>
+            </div>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#demo">Demo</a>
+                <a href="../auth/login.html" class="btn-secondary">Login</a>
+                <a href="../auth/signup.html" class="btn-primary">Get Started</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="badge-dot"></span>
+                AI-Powered Attendance
+            </div>
+            <h1 class="hero-title">
+                <span class="gradient-text">Train.</span>
+                <span class="gradient-text">Recognize.</span>
+                <span class="gradient-text">Track.</span>
+            </h1>
+            <p class="hero-subtitle">
+                Next-generation face recognition attendance system powered by deep learning.
+                Train custom models, recognize faces in real-time, and track attendance effortlessly.
+            </p>
+            <div class="hero-cta">
+                <a href="../auth/signup.html" class="btn-hero">
+                    Try Demo
+                    <span class="btn-arrow">→</span>
+                </a>
+                <a href="#how-it-works" class="btn-outline">
+                    Learn More
+                </a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <div class="stat-number">99.8%</div>
+                    <div class="stat-label">Accuracy</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">&lt;2s</div>
+                    <div class="stat-label">Recognition</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">Availability</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="section-header">
+            <span class="section-label">Features</span>
+            <h2 class="section-title">Everything you need for <span class="highlight">smart attendance</span></h2>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card" data-aos="fade-up">
+                <div class="feature-icon">🧠</div>
+                <h3>ArcFace Technology</h3>
+                <p>State-of-the-art deep learning face recognition with 99.8% accuracy using InsightFace ArcFace models.</p>
+            </div>
+            <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
+                <div class="feature-icon">⚡</div>
+                <h3>Real-Time Recognition</h3>
+                <p>Instant face detection and recognition via browser webcam with optimized CPU performance.</p>
+            </div>
+            <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
+                <div class="feature-icon">📊</div>
+                <h3>Excel Integration</h3>
+                <p>Automatic attendance tracking with exportable Excel files. Edit, share, and analyze with ease.</p>
+            </div>
+            <div class="feature-card" data-aos="fade-up">
+                <div class="feature-icon">🔐</div>
+                <h3>Multi-Project System</h3>
+                <p>Manage up to 5 independent projects. Perfect for multiple classes, departments, or teams.</p>
+            </div>
+            <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
+                <div class="feature-icon">🎯</div>
+                <h3>Custom Training</h3>
+                <p>Upload your dataset and train personalized models. Full control over your recognition system.</p>
+            </div>
+            <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
+                <div class="feature-icon">🌐</div>
+                <h3>Browser-Based</h3>
+                <p>No installations required. Access your attendance system from any device with a web browser.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="how-it-works">
+        <div class="section-header">
+            <span class="section-label">Process</span>
+            <h2 class="section-title">Simple workflow, <span class="highlight">powerful results</span></h2>
+        </div>
+        <div class="steps-container">
+            <div class="step" data-aos="fade-right">
+                <div class="step-number">01</div>
+                <div class="step-content">
+                    <h3>Upload Dataset</h3>
+                    <p>Upload a ZIP file with person folders, each containing minimum 10 images. Our system validates and prepares your data automatically.</p>
+                </div>
+            </div>
+            <div class="step" data-aos="fade-right" data-aos-delay="100">
+                <div class="step-number">02</div>
+                <div class="step-content">
+                    <h3>Train Model</h3>
+                    <p>Click train and let our ArcFace-powered engine create face embeddings. Track progress in real-time with detailed statistics.</p>
+                </div>
+            </div>
+            <div class="step" data-aos="fade-right" data-aos-delay="200">
+                <div class="step-number">03</div>
+                <div class="step-content">
+                    <h3>Recognize Faces</h3>
+                    <p>Start recognition via browser webcam. Our system identifies faces instantly and marks attendance automatically.</p>
+                </div>
+            </div>
+            <div class="step" data-aos="fade-right" data-aos-delay="300">
+                <div class="step-number">04</div>
+                <div class="step-content">
+                    <h3>Download Reports</h3>
+                    <p>Export attendance as Excel files. Analyze data, generate reports, and maintain records effortlessly.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Demo Video Section -->
+    <section id="demo" class="demo-section">
+        <div class="demo-container">
+            <div class="demo-content">
+                <span class="section-label">See It In Action</span>
+                <h2 class="section-title">Watch RupX in <span class="highlight">action</span></h2>
+                <p class="demo-description">
+                    Experience the power of AI-driven attendance tracking. From dataset upload to real-time recognition, see how RupX transforms attendance management.
+                </p>
+                <a href="../auth/signup.html" class="btn-demo">Start Free Trial</a>
+            </div>
+            <div class="demo-visual">
+                <div class="video-wrapper">
+                    <video autoplay muted loop playsinline>
+                        <source src="RupX.mp4" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2 class="cta-title">Ready to revolutionize attendance tracking?</h2>
+            <p class="cta-subtitle">Join organizations using RupX for smarter, faster attendance management.</p>
+            <div class="cta-buttons">
+                <a href="../auth/signup.html" class="btn-cta-primary">Get Started Free</a>
+                <a href="../auth/login.html" class="btn-cta-secondary">Sign In</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <div class="footer-logo">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">RupX</span>
+                </div>
+                <p class="footer-tagline">AI-Powered Attendance Tracking</p>
+            </div>
+            <div class="footer-links">
+                <div class="footer-column">
+                    <h4>Product</h4>
+                    <a href="#features">Features</a>
+                    <a href="#how-it-works">How It Works</a>
+                    <a href="#demo">Demo</a>
+                </div>
+                <div class="footer-column">
+                    <h4>Company</h4>
+                    <a href="#">About</a>
+                    <a href="#">Contact</a>
+                    <a href="#">Support</a>
+                </div>
+                <div class="footer-column">
+                    <h4>Legal</h4>
+                    <a href="#">Privacy</a>
+                    <a href="#">Terms</a>
+                    <a href="#">Security</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 RupX. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="Three.js"></script>
+    <script src="cursor.js"></script>
+    <script src="animations.js"></script>
+</body>
+</html>

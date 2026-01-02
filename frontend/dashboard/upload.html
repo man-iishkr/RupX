@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Dataset - RupX</title>
+    <link rel="stylesheet" href="dashboard-styles.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">RupX</span>
+            </div>
+            <div class="sidebar-menu">
+                <a href="projects.html" class="menu-item">
+                    <span>📁</span> Projects
+                </a>
+                <a href="upload.html" class="menu-item active">
+                    <span>📤</span> Upload Dataset
+                </a>
+                <a href="train.html" class="menu-item">
+                    <span>🧠</span> Train Model
+                </a>
+                <a href="test.html" class="menu-item">
+                    <span>🎥</span> Test Recognition
+                </a>
+                <a href="attendance.html" class="menu-item">
+                    <span>📊</span> Attendance
+                </a>
+            </div>
+            <div class="sidebar-footer">
+                <button onclick="logout()" class="btn-logout">Logout</button>
+            </div>
+        </nav>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Upload Dataset</h1>
+            </header>
+            
+            <div class="upload-container">
+                <div class="upload-zone" id="upload-zone">
+                    <div class="upload-icon">📦</div>
+                    <h3>Drag & Drop ZIP File</h3>
+                    <p>or click to browse</p>
+                    <input type="file" id="file-input" accept=".zip" style="display: none;">
+                    <button class="btn-primary" onclick="document.getElementById('file-input').click()">
+                        Select ZIP File
+                    </button>
+                </div>
+                
+                <div id="upload-progress" class="progress-container" style="display: none;">
+                    <h3>Uploading...</h3>
+                    <div class="progress-bar">
+                        <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="progress-text" class="progress-text">0%</div>
+                </div>
+                
+                <div id="validation-results" style="display: none; margin-top: 2rem;"></div>
+                
+                <div class="upload-requirements">
+                    <h4>📋 Dataset Requirements</h4>
+                    <ul>
+                        <li><span>✓</span> <span>ZIP file format only</span></li>
+                        <li><span>✓</span> <span>Each person in separate folder</span></li>
+                        <li><span>✓</span> <span>Minimum 10 images per person</span></li>
+                        <li><span>✓</span> <span>JPG, JPEG, or PNG format</span></li>
+                        <li><span>✓</span> <span>Clear face visibility</span></li>
+                        <li><span>✓</span> <span>Good lighting conditions</span></li>
+                    </ul>
+                    
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-dark); border-radius: 8px;">
+                        <strong>Example Structure:</strong>
+                        <pre style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+dataset.zip
+├── Person_1/
+│   ├── img1.jpg
+│   ├── img2.jpg
+│   └── ... (min 10 images)
+├── Person_2/
+│   └── ...
+                        </pre>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="dashboard.js"></script>
+    <script src="upload.js"></script>
+</body>
+</html>

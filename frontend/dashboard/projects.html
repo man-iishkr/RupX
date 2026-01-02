@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projects - RupX</title>
+    <link rel="stylesheet" href="dashboard-styles.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">RupX</span>
+            </div>
+            <div class="sidebar-menu">
+                <a href="projects.html" class="menu-item active">
+                    <span>📁</span> Projects
+                </a>
+                <a href="upload.html" class="menu-item">
+                    <span>📤</span> Upload Dataset
+                </a>
+                <a href="train.html" class="menu-item">
+                    <span>🧠</span> Train Model
+                </a>
+                <a href="test.html" class="menu-item">
+                    <span>🎥</span> Test Recognition
+                </a>
+                <a href="attendance.html" class="menu-item">
+                    <span>📊</span> Attendance
+                </a>
+            </div>
+            <div class="sidebar-footer">
+                <button onclick="logout()" class="btn-logout">Logout</button>
+            </div>
+        </nav>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h1>My Projects</h1>
+                <button onclick="showCreateModal()" class="btn-primary">+ New Project</button>
+            </header>
+            
+            <div id="projects-grid" class="projects-grid">
+                <!-- Projects will be loaded here -->
+            </div>
+        </main>
+    </div>
+    
+    <!-- Create Project Modal -->
+    <div id="create-modal" class="modal">
+        <div class="modal-content">
+            <h2>Create New Project</h2>
+            <form id="create-form">
+                <div class="form-group">
+                    <label>Project Name</label>
+                    <input type="text" id="project-name" required placeholder="e.g., CS Department">
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="hideCreateModal()" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script src="dashboard.js"></script>
+    <script src="projects.js"></script>
+</body>
+</html>
