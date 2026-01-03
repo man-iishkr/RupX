@@ -1,27 +1,44 @@
-# Server
+# --- Web & Infrastructure ---
 gunicorn==21.2.0
-gevent==24.11.1
-gevent-websocket==0.10.1
+gevent
+gevent-websocket
 Flask==3.1.2
-Flask-SocketIO==5.5.0
+Flask-SocketIO>=5.5.0
 Flask-CORS==6.0.2
-
-# Core ML (3.11 Compatible)
-numpy==1.26.4
-pandas==2.2.3
-opencv-python-headless==4.10.0.84
-insightface==0.7.3
-tensorflow==2.15.0
-ml_dtypes>=0.4.0
-onnx==1.16.1
-onnxruntime==1.19.2
-scikit-learn==1.5.2
-scikit-image==0.24.0
-
-# Dependencies
+python-socketio
+python-engineio
+Werkzeug==3.1.3
 setuptools
 Cython
-Pillow==11.0.0
-bcrypt==4.2.1
-python-dotenv==1.0.1
-requests==2.32.3
+python-dotenv
+
+# --- AI & Computer Vision (Core) ---
+# We keep numpy below 2.0.0 because many ML libs aren't ready for 2.0 yet
+numpy>=1.24.0,<2.0.0
+opencv-python-headless
+insightface==0.7.3
+onnx
+onnxruntime
+ml-dtypes>=0.2.0
+tensorflow>=2.13.0
+mtcnn
+scikit-learn
+scikit-image
+scipy
+
+# --- Image Processing & Data ---
+Pillow
+albumentations
+imageio
+matplotlib
+pandas
+
+# --- Utilities & Security ---
+bcrypt
+requests
+pydantic
+tqdm
+easydict
+pyyaml
+coloredlogs
+humanfriendly
