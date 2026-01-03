@@ -214,10 +214,17 @@ def mark_attendance(session, name):
     current_time = datetime.now().strftime('%H:%M:%S')
     
     df = session['attendance_df']
+    attendance_mode = session['attendance_mode']
     
-    # Check if already marked
-    if name in session['marked_today']:
-        return False
+    # Check if already marked based on mode
+    if attendance_mode == 'daily':
+        # Daily mode: Check if marked today
+        if name in session['marked_today']:
+            return False
+    elif attendance_mode == 'sessional':
+        # Sessional mode: Check if marked this session (always check marked_today for current session)
+        if name in session['marked_today']:
+            return False
     
     # Check if name exists
     if name not in df["NAME"].values:
@@ -230,24 +237,38 @@ def mark_attendance(session, name):
     # Mark attendance
     row_index = df[df["NAME"] == name].index[0]
     
-    if pd.isna(df.at[row_index, today]) or df.at[row_index, today] == "":
-        df.at[row_index, today] = current_time
-        df.to_excel(session['attendance_path'], index=False, engine='openpyxl')
-        session['marked_today'].add(name)
-        print(f"✅ {name} marked at {current_time}")
-        
-        # Emit to all clients
-        if socketio:
-            key = f"{session['user_id']}_{session['project_id']}"
-            for client_id in session['clients']:
-                socketio.emit('attendance_marked', {
-                    'name': name,
-                    'time': current_time
-                }, room=client_id)
-        
-        return True
+    # For sessional mode, append time if already marked today
+    if attendance_mode == 'sessional':
+        current_value = df.at[row_index, today]
+        if pd.isna(current_value) or current_value == "":
+            df.at[row_index, today] = current_time
+        else:
+            # Append new time (sessional)
+            df.at[row_index, today] = f"{current_value}, {current_time}"
+    else:
+        # Daily mode - mark only once
+        if pd.isna(df.at[row_index, today]) or df.at[row_index, today] == "":
+            df.at[row_index, today] = current_time
+        else:
+            return False  # Already marked today
     
-    return False
+    df.to_excel(session['attendance_path'], index=False, engine='openpyxl')
+    session['marked_today'].add(name)
+    
+    mode_text = "session" if attendance_mode == 'sessional' else "day"
+    print(f"✅ {name} marked at {current_time} ({mode_text})")
+    
+    # Emit to all clients
+    if socketio:
+        key = f"{session['user_id']}_{session['project_id']}"
+        for client_id in session['clients']:
+            socketio.emit('attendance_marked', {
+                'name': name,
+                'time': current_time,
+                'mode': attendance_mode
+            }, room=client_id)
+    
+    return True
 
 def recognition_worker(session_key):
     """Background thread for face recognition"""

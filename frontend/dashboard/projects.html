@@ -48,17 +48,28 @@
     </div>
     
     <!-- Create Project Modal -->
-    <div id="create-modal" class="modal">
-        <div class="modal-content">
+    <div id="create-modal" class="modal" onclick="handleModalClick(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
             <h2>Create New Project</h2>
             <form id="create-form">
                 <div class="form-group">
                     <label>Project Name</label>
                     <input type="text" id="project-name" required placeholder="e.g., CS Department">
                 </div>
+                <div class="form-group">
+                    <label>Attendance Marking Mode</label>
+                    <select id="attendance-mode" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-dark); color: var(--text-primary);">
+                        <option value="daily">Daily (Once per day)</option>
+                        <option value="sessional">Sessional (Once per session)</option>
+                    </select>
+                    <small style="color: var(--text-secondary); display: block; margin-top: 0.5rem;">
+                        Daily: Each person marked once per day<br>
+                        Sessional: Each person marked once per recognition session
+                    </small>
+                </div>
                 <div class="form-actions">
                     <button type="button" onclick="hideCreateModal()" class="btn-secondary">Cancel</button>
-                    <button type="submit" class="btn-primary">Create</button>
+                    <button type="submit" id="create-btn" class="btn-primary">Create</button>
                 </div>
             </form>
         </div>

@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    last_login TEXT
+    last_login TEXT,
+    verified INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS projects (

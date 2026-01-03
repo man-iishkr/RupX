@@ -108,9 +108,13 @@ body {
     color: var(--primary);
 }
 
-.logo-icon {
-    font-size: 2rem;
-    animation: pulse 2s infinite;
+.logo-icon img {
+    width: 40px;        
+    height: 40px;       
+    border-radius: 50%;  
+    object-fit: cover;  
+    display: block; 
+    animation: pulse 2s infinite;     
 }
 
 @keyframes pulse {
@@ -493,6 +497,7 @@ body {
     border-radius: 24px;
     overflow: hidden;
     cursor: pointer;
+    padding: 10rem;
 }
 
 .play-button {

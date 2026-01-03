@@ -1,0 +1,9 @@
+.env
+rupx.db
+storage/
+backend/__pycache__/
+frontend/__pycache__/
+frontend/auth/__pycache__/
+frontend/landing/__pycache__/
+node_modules/
+backend/storage/

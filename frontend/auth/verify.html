@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email - RupX</title>
+    <link rel="stylesheet" href="auth-style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-left">
+            <div class="auth-brand">
+                <span class="logo-icon"><img src="../landing/RupX_Logo.png" alt="RupX Logo"></span>
+                <span class="logo-text">RupX</span>
+            </div>
+            <h1>Verify Your Email</h1>
+            <p>Enter the 6-digit code sent to <strong id="user-email"></strong></p>
+            
+            <form id="verify-form" class="auth-form">
+                <div class="form-group">
+                    <label for="otp">Verification Code</label>
+                    <input type="text" id="otp" name="otp" required placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" style="letter-spacing: 10px; font-size: 1.5rem; text-align: center; font-family: 'Courier New', monospace;">
+                </div>
+                
+                <div id="error-message" class="error-message"></div>
+                
+                <button type="submit" class="btn-submit">Verify & Continue</button>
+                
+                <div style="text-align: center; margin-top: 1rem;">
+                    <button type="button" id="resend-btn" class="btn-link" onclick="resendOTP()">
+                        Resend Code
+                    </button>
+                </div>
+            </form>
+            
+            <div class="auth-footer">
+                <a href="signup.html">← Back to Signup</a>
+            </div>
+        </div>
+        
+        <div class="auth-right">
+            <div class="auth-visual">
+                <div class="visual-circle"></div>
+                <div class="visual-card">
+                    <div class="card-icon">✉️</div>
+                    <h3>Check Your Email</h3>
+                    <p>We've sent a verification code to your email address. Please check your inbox and spam folder.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://127.0.0.1:5000/api';
+        
+        // Get email from URL params
+        const urlParams = new URLSearchParams(window.location.search);
+        const email = urlParams.get('email');
+        
+        if (!email) {
+            window.location.href = 'signup.html';
+        }
+        
+        document.getElementById('user-email').textContent = email;
+        
+        // Auto-focus OTP input
+        document.getElementById('otp').focus();
+        
+        // Show error message
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+        }
+        
+        // Hide error message
+        function hideError() {
+            const errorEl = document.getElementById('error-message');
+            errorEl.classList.remove('show');
+        }
+        
+        // Handle verification
+        document.getElementById('verify-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+            
+            const otp = document.getElementById('otp').value.trim();
+            
+            if (otp.length !== 6) {
+                showError('Please enter a 6-digit code');
+                return;
+            }
+            
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/verify-otp`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, otp })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Success - redirect to dashboard
+                    window.location.href = '../dashboard/projects.html';
+                } else {
+                    showError(data.error || 'Verification failed');
+                    btn.disabled = false;
+                    btn.textContent = 'Verify & Continue';
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Verify & Continue';
+            }
+        });
+        
+        // Resend OTP
+        async function resendOTP() {
+            const btn = document.getElementById('resend-btn');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/resend-otp`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ email })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showError('✓ Code resent! Check your email.');
+                    setTimeout(() => hideError(), 3000);
+                } else {
+                    showError(data.error || 'Failed to resend code');
+                }
+            } catch (error) {
+                showError('Network error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Resend Code';
+            }
+        }
+        
+        // Auto-submit when 6 digits entered
+        document.getElementById('otp').addEventListener('input', (e) => {
+            if (e.target.value.length === 6) {
+                setTimeout(() => {
+                    document.getElementById('verify-form').dispatchEvent(new Event('submit'));
+                }, 300);
+            }
+        });
+    </script>
+    
+    <style>
+        .btn-link {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            transition: opacity 0.3s ease;
+        }
+        
+        .btn-link:hover {
+            opacity: 0.8;
+        }
+        
+        .btn-link:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .error-message.show {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--success);
+            color: var(--success);
+        }
+    </style>
+</body>
+</html>

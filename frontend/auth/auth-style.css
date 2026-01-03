@@ -46,8 +46,12 @@ body {
     margin-bottom: 3rem;
 }
 
-.logo-icon {
-    font-size: 2rem;
+.logo-icon img {
+    width: 40px;         /* Set a specific width */
+    height: 40px;        /* Set a specific height (must match width) */
+    border-radius: 50%;  /* Makes the image circular */
+    object-fit: cover;   /* Prevents the image from stretching */
+    display: block;      /* Removes bottom whitespace */
 }
 
 h1 {

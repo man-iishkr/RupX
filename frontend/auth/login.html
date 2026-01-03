@@ -10,7 +10,7 @@
     <div class="auth-container">
         <div class="auth-left">
             <div class="auth-brand">
-                <span class="logo-icon">⚡</span>
+                <span class="logo-icon"><img src="../landing/RupX_Logo.png" alt="RupX Logo"></span>
                 <span class="logo-text">RupX</span>
             </div>
             <h1>Welcome back</h1>
@@ -49,6 +49,71 @@
         </div>
     </div>
     
-    <script src="auth.js"></script>
+    <script>
+        const API_BASE = 'http://127.0.0.1:5000/api';
+        
+        // Show error message
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+        }
+        
+        // Hide error message
+        function hideError() {
+            const errorEl = document.getElementById('error-message');
+            errorEl.classList.remove('show');
+        }
+        
+        // Handle Login
+        const loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideError();
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                // Disable button
+                const btn = loginForm.querySelector('button');
+                btn.disabled = true;
+                btn.textContent = 'Signing in...';
+                
+                try {
+                    const response = await fetch(`${API_BASE}/auth/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({ email, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        // Success - redirect to dashboard
+                        window.location.href = '../dashboard/projects.html';
+                    } else if (response.status === 403 && data.needs_verification) {
+                        // Email not verified - redirect to verify page
+                        showError('Please verify your email first. Redirecting...');
+                        setTimeout(() => {
+                            window.location.href = `verify.html?email=${encodeURIComponent(data.email)}`;
+                        }, 2000);
+                    } else {
+                        showError(data.error || 'Login failed');
+                        btn.disabled = false;
+                        btn.textContent = 'Sign In';
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    showError('Network error. Please try again.');
+                    btn.disabled = false;
+                    btn.textContent = 'Sign In';
+                }
+            });
+        }
+    </script>
 </body>
 </html>

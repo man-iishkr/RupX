@@ -1,17 +1,5 @@
 // Projects Management
-// const API_BASE = "http://127.0.0.1:5000/api";
 let projects = [];
-
-// Helper function to format the date (FIXED: Added missing function)
-function formatDate(dateString) {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
-}
 
 // Load projects on page load
 window.addEventListener('DOMContentLoaded', async () => {
@@ -102,6 +90,7 @@ document.getElementById('create-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const name = document.getElementById('project-name').value.trim();
+    const attendance_mode = document.getElementById('attendance-mode').value;
     
     if (!name) {
         showAlert('Project name required', 'error');
@@ -115,7 +104,7 @@ document.getElementById('create-form').addEventListener('submit', async (e) => {
                 'Content-Type': 'application/json'
             },
             credentials: 'include',
-            body: JSON.stringify({ name })
+            body: JSON.stringify({ name, attendance_mode })
         });
         
         const data = await response.json();
@@ -125,7 +114,6 @@ document.getElementById('create-form').addEventListener('submit', async (e) => {
             hideCreateModal();
             await loadProjects();
         } else {
-            // Note: 409 Conflict usually means a project with this name already exists
             showAlert(data.error || 'Failed to create project', 'error');
         }
     } catch (error) {
@@ -183,8 +171,4 @@ function handleModalClick(event) {
     if (event.target.id === 'create-modal') {
         hideCreateModal();
     }
-}
-
-function showAlert(message, type = 'info') {
-    alert(message);
 }
