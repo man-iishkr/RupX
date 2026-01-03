@@ -80,4 +80,5 @@ if __name__ == '__main__':
     print("=" * 60)
     
     # Run with SocketIO - allow_unsafe_werkzeug=True is needed for Flask 3.x/Werkzeug 3.x
-    socketio.run(app, host='127.0.0.1', port=5000, debug=False, allow_unsafe_werkzeug=True)
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, host='127.0.0.1', port=port, debug=False, allow_unsafe_werkzeug=True)
