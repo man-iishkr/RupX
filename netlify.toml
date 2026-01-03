@@ -1,0 +1,30 @@
+[build]
+  # Tell Netlify to look inside the frontend folder
+  base = "frontend"
+  
+  # Publish everything inside frontend so paths like /auth/ and /dashboard/ work
+  publish = "."
+
+[build.processing.html]
+  # This makes 'login.html' available at '/auth/login' (prettier URLs)
+  pretty_urls = true
+
+[[redirects]]
+  # 1. Map the root URL to your landing page
+  from = "/"
+  to = "/landing/index.html"
+  status = 200
+
+[[redirects]]
+  # 2. Redirect /dashboard to the main dashboard page (if you have one)
+  # Or redirect it to a specific file like attendance.html
+  from = "/dashboard"
+  to = "/dashboard/projects.html"
+  status = 200
+
+[[redirects]]
+  # 3. SPA Fallback: If a user refreshes on a sub-route, 
+  # keep them on the landing page instead of showing a 404
+  from = "/*"
+  to = "/landing/index.html"
+  status = 200

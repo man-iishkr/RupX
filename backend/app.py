@@ -15,12 +15,12 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max upload
 
 # Enable CORS - Ensure your frontend port (8080) is authorized
-CORS(app, supports_credentials=True, origins=['http://127.0.0.1:8080', 'http://localhost:8080'])
+CORS(app, supports_credentials=True, origins=['http://127.0.0.1:8080', 'http://localhost:8080','https://rupx-backend.onrender.com','https://rupx.netlify.app'])
 
 # Initialize SocketIO
 # CHANGED: async_mode set to None to allow eventlet to take over (more stable for workers)
 socketio = SocketIO(app, 
-                    cors_allowed_origins=['http://127.0.0.1:8080', 'http://localhost:8080'], 
+                    cors_allowed_origins=['http://127.0.0.1:8080', 'http://localhost:8080','https://rupx-backend.onrender.com','https://rupx.netlify.app'], 
                     async_mode='threading', # Force standard threading
                     ping_timeout=60, 
                     ping_interval=25)

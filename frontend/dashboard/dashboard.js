@@ -1,5 +1,5 @@
 // Common Dashboard Functions
-const API_BASE = 'http://127.0.0.1:5000/api';
+const API_BASE = 'https://rupx-backend.onrender.com/api';
 
 // Check authentication on load
 window.addEventListener('DOMContentLoaded', async () => {
