@@ -16,13 +16,79 @@ if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
     print("⚠️  Warning: TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not set")
     print("   Falling back to local SQLite")
 
-def dict_factory(cursor, row):
-    """Convert row to dictionary for dict-like access"""
-    fields = [column[0] for column in cursor.description]
-    return dict(zip(fields, row))
+class DictCursor:
+    """Custom cursor wrapper that returns rows as dictionaries"""
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self.description = cursor.description
+        self.rowcount = cursor.rowcount
+    
+    def execute(self, query, params=None):
+        if params:
+            return self._cursor.execute(query, params)
+        return self._cursor.execute(query)
+    
+    def executescript(self, script):
+        return self._cursor.executescript(script)
+    
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        if row is None:
+            return None
+        if self.description:
+            return dict(zip([col[0] for col in self.description], row))
+        return row
+    
+    def fetchall(self):
+        rows = self._cursor.fetchall()
+        if not rows:
+            return []
+        if self.description:
+            return [dict(zip([col[0] for col in self.description], row)) for row in rows]
+        return rows
+    
+    def fetchmany(self, size=None):
+        rows = self._cursor.fetchmany(size) if size else self._cursor.fetchmany()
+        if not rows:
+            return []
+        if self.description:
+            return [dict(zip([col[0] for col in self.description], row)) for row in rows]
+        return rows
+    
+    def close(self):
+        return self._cursor.close()
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+class DictConnection:
+    """Connection wrapper that returns DictCursor"""
+    def __init__(self, conn):
+        self._conn = conn
+    
+    def cursor(self):
+        return DictCursor(self._conn.cursor())
+    
+    def commit(self):
+        return self._conn.commit()
+    
+    def rollback(self):
+        return self._conn.rollback()
+    
+    def close(self):
+        return self._conn.close()
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
 def get_db():
-    """Get Turso database connection"""
+    """Get Turso database connection with dict cursor support"""
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
         raise ValueError("Turso credentials not configured")
     
@@ -33,10 +99,9 @@ def get_db():
             auth_token=TURSO_AUTH_TOKEN
         )
         
-        # Enable dict-like row access using custom factory
-        conn.row_factory = dict_factory
+        # Wrap connection to return dicts
+        return DictConnection(conn)
         
-        return conn
     except Exception as e:
         print(f"❌ Error connecting to Turso: {e}")
         raise
@@ -68,19 +133,21 @@ def init_db():
                 if statement:
                     try:
                         cursor.execute(statement)
+                        conn.commit()
                     except Exception as stmt_error:
                         # Some statements might fail if tables already exist
-                        if 'already exists' not in str(stmt_error).lower():
+                        error_msg = str(stmt_error).lower()
+                        if 'already exists' not in error_msg and 'duplicate' not in error_msg:
                             print(f"⚠️  Warning executing statement: {stmt_error}")
         
-        conn.commit()
         print("✅ Turso database initialized successfully")
         
         # Verify tables were created
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = cursor.fetchall()
         if tables:
-            print(f"📋 Created tables: {', '.join([t['name'] if isinstance(t, dict) else t[0] for t in tables])}")
+            table_names = [t['name'] for t in tables]
+            print(f"📋 Tables in database: {', '.join(table_names)}")
         
         cursor.close()
         conn.close()
@@ -96,12 +163,11 @@ def verify_connection():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT 1")
+        cursor.execute("SELECT 1 as test")
         result = cursor.fetchone()
         cursor.close()
         conn.close()
-        # Handle both dict and tuple return types
-        return (result.get('1') if isinstance(result, dict) else result[0]) == 1
+        return result and result.get('test') == 1
     except Exception as e:
         print(f"❌ Turso connection verification failed: {e}")
         return False
@@ -117,7 +183,7 @@ if __name__ == '__main__':
         print("   Please set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN")
         exit(1)
     
-    print(f"Database URL: {TURSO_DATABASE_URL[:30]}...")
+    print(f"Database URL: {TURSO_DATABASE_URL[:50]}...")
     print(f"Auth Token: {TURSO_AUTH_TOKEN[:20]}...")
     
     # Verify connection
