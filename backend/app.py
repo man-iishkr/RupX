@@ -56,6 +56,10 @@ else:
 # Initialize database on startup
 def initialize_database():
     """Initialize database if not already set up"""
+    print("\n" + "=" * 60)
+    print("Database Initialization")
+    print("=" * 60)
+    
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -64,30 +68,44 @@ def initialize_database():
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
         result = cursor.fetchone()
         
-        if not result:
-            print("⚠️  Database tables not found. Initializing...")
-            cursor.close()
-            conn.close()
+        cursor.close()
+        conn.close()
+        
+        # Handle both dict and tuple results
+        has_users_table = False
+        if result:
+            if isinstance(result, dict):
+                has_users_table = result.get('name') == 'users'
+            else:
+                has_users_table = result[0] == 'users'
+        
+        if not has_users_table:
+            print("⚠️  Users table not found. Initializing schema...")
             init_db()
-            print("✅ Database initialized successfully")
+            print("✅ Database initialized")
         else:
             print("✅ Database ready")
-            cursor.close()
-            conn.close()
             
     except Exception as e:
-        print(f"⚠️  Database error: {e}")
-        print("   Attempting to initialize database...")
+        print(f"⚠️  Database check failed: {e}")
+        print("   Attempting initialization...")
         try:
             init_db()
-            print("✅ Database initialized successfully")
+            print("✅ Database initialized")
         except Exception as init_error:
-            print(f"❌ Failed to initialize database: {init_error}")
+            print(f"❌ Initialization failed: {init_error}")
+            print("\n⚠️  APP WILL START BUT DATABASE MAY NOT WORK")
             import traceback
             traceback.print_exc()
+    
+    print("=" * 60 + "\n")
 
 # Call initialization
-initialize_database()
+try:
+    initialize_database()
+except Exception as e:
+    print(f"❌ Critical error during startup: {e}")
+    # Continue anyway - some endpoints might still work
 
 # Import API routes
 from api import auth, dataset, train, recognize, attendance
