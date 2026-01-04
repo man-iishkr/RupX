@@ -1,6 +1,6 @@
 """
 Turso (Cloud SQLite) Database Connection
-Uses libsql (not libsql-experimental) for compatibility
+Uses libsql for compatibility with Render deployment
 """
 import libsql
 import os
@@ -16,6 +16,11 @@ if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
     print("⚠️  Warning: TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not set")
     print("   Falling back to local SQLite")
 
+def dict_factory(cursor, row):
+    """Convert row to dictionary for dict-like access"""
+    fields = [column[0] for column in cursor.description]
+    return dict(zip(fields, row))
+
 def get_db():
     """Get Turso database connection"""
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
@@ -28,8 +33,8 @@ def get_db():
             auth_token=TURSO_AUTH_TOKEN
         )
         
-        # Enable dict-like row access
-        conn.row_factory = libsql.Row
+        # Enable dict-like row access using custom factory
+        conn.row_factory = dict_factory
         
         return conn
     except Exception as e:
@@ -74,7 +79,8 @@ def init_db():
         # Verify tables were created
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = cursor.fetchall()
-        print(f"📋 Created tables: {', '.join([t[0] for t in tables])}")
+        if tables:
+            print(f"📋 Created tables: {', '.join([t['name'] if isinstance(t, dict) else t[0] for t in tables])}")
         
         cursor.close()
         conn.close()
@@ -94,7 +100,8 @@ def verify_connection():
         result = cursor.fetchone()
         cursor.close()
         conn.close()
-        return result[0] == 1
+        # Handle both dict and tuple return types
+        return (result.get('1') if isinstance(result, dict) else result[0]) == 1
     except Exception as e:
         print(f"❌ Turso connection verification failed: {e}")
         return False
