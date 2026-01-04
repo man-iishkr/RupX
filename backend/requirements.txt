@@ -42,3 +42,4 @@ easydict
 pyyaml
 coloredlogs
 humanfriendly
+libsql==0.1.11
