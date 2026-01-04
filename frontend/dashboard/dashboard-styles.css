@@ -89,8 +89,13 @@ body::before {
     color: var(--primary);
 }
 
-.logo-icon {
-    font-size: 2rem;
+.logo-icon img {
+    width: 40px;        
+    height: 40px;       
+    border-radius: 50%;  
+    object-fit: cover;  
+    display: block; 
+    animation: pulse 2s infinite;     
 }
 
 .sidebar-menu {
