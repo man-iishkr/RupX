@@ -9,22 +9,26 @@ from functools import wraps
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Changed for cross-origin
+app.config['SESSION_COOKIE_SECURE'] = True      # Required with SameSite=None
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max upload
 
-# Enable CORS
+# CORS Configuration - CRITICAL FIX
 CORS(app, 
-     supports_credentials=True, 
+     supports_credentials=True,
      origins=[
-         'http://127.0.0.1:8080', 
+         'http://127.0.0.1:8080',
          'http://localhost:8080',
          'https://rupx-backend.onrender.com',
          'https://rupx.netlify.app'
-     ])
+     ],
+     allow_headers=['Content-Type', 'Authorization'],
+     expose_headers=['Content-Type'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
-# Initialize SocketIO
+# Initialize SocketIO with optimized settings
 socketio = SocketIO(
     app, 
     cors_allowed_origins=[
@@ -34,8 +38,9 @@ socketio = SocketIO(
         'https://rupx.netlify.app'
     ], 
     async_mode='threading',
-    ping_timeout=60, 
-    ping_interval=25
+    ping_timeout=120,          # Increased timeout
+    ping_interval=25,
+    max_http_buffer_size=10 * 1024 * 1024  # 10MB buffer
 )
 
 # Create storage directories
@@ -43,8 +48,8 @@ os.makedirs('storage/users', exist_ok=True)
 os.makedirs('database', exist_ok=True)
 os.makedirs('storage/models', exist_ok=True)
 
-# Initialize database connection based on environment
-from utils.db import get_db, DB_TYPE, init_db
+# Initialize database connection
+from utils.db import get_db, init_db, DB_TYPE
 
 # Initialize database on startup
 def initialize_database():
@@ -88,17 +93,14 @@ def initialize_database():
         except Exception as init_error:
             print(f"❌ Initialization failed: {init_error}")
             print("\n⚠️  APP WILL START BUT DATABASE MAY NOT WORK")
-            import traceback
-            traceback.print_exc()
     
     print("=" * 60 + "\n")
 
-# Call initialization
+# Call initialization with timeout protection
 try:
     initialize_database()
 except Exception as e:
     print(f"❌ Critical error during startup: {e}")
-    # Continue anyway - some endpoints might still work
 
 # Import API routes
 from api import auth, dataset, train, recognize, attendance
@@ -110,11 +112,12 @@ app.register_blueprint(train.bp, url_prefix='/api/train')
 app.register_blueprint(recognize.bp, url_prefix='/api/recognize')
 app.register_blueprint(attendance.bp, url_prefix='/api/attendance')
 
-# Import WebSocket handlers
-from websocket import video_stream
-
-# Initialize video streaming
-video_stream.init_socketio(socketio)
+# Import WebSocket handlers (only if needed)
+try:
+    from websocket import video_stream
+    video_stream.init_socketio(socketio)
+except ImportError:
+    print("⚠️  WebSocket module not found, skipping video stream")
 
 # Error handlers
 @app.errorhandler(404)
@@ -148,23 +151,34 @@ def root():
         'database': DB_TYPE
     })
 
+# Add OPTIONS handler for CORS preflight
+@app.before_request
+def handle_preflight():
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response, 200
+
 if __name__ == '__main__':
     print("=" * 60)
     print("RupX Backend Server")
     print("=" * 60)
     print(f"Database: {DB_TYPE.upper()}")
-    print("Server: http://127.0.0.1:5000")
-    print("WebSocket: ws://127.0.0.1:5000/socket.io")
+    print("Server: http://0.0.0.0:5000")
+    print("WebSocket: ws://0.0.0.0:5000/socket.io")
     print("=" * 60)
     
-    # Get port from environment or default to 5000
+    # Get port from environment
     port = int(os.environ.get('PORT', 5000))
     
     # Run with SocketIO
     socketio.run(
         app, 
-        host='0.0.0.0',  # Changed to 0.0.0.0 for deployment
+        host='0.0.0.0',
         port=port, 
-        debug=os.getenv('FLASK_ENV') == 'development',
+        debug=False,  # NEVER True in production
         allow_unsafe_werkzeug=True
     )
