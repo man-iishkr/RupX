@@ -7,7 +7,7 @@ export PYTHONUNBUFFERED=1
 
 # Start gunicorn with optimized settings
 exec gunicorn app:app \
-  --worker-class gevent \
+  --worker-class gthread \
   --workers 1 \
   --threads 2 \
   --worker-connections 100 \
