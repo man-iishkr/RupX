@@ -4,7 +4,7 @@ import threading
 import time
 from datetime import datetime
 import numpy as np
-from utils.db_init import get_db
+from utils.db import get_db
 from ml.face_embedding import train_embeddings
 import pandas as pd
 

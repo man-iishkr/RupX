@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, session
 import os
-from utils.db_init import get_db
+from utils.db import get_db
 from websocket.video_stream import get_recognition_status, start_recognition_session, stop_recognition_session
 
 bp = Blueprint('recognize', __name__)

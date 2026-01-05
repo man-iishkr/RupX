@@ -4,7 +4,7 @@ import zipfile
 import shutil
 from werkzeug.utils import secure_filename
 from PIL import Image
-from utils.db_init import get_db
+from utils.db import get_db
 
 bp = Blueprint('dataset', __name__)
 

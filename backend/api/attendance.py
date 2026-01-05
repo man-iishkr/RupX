@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, session, send_file
 import os
 from datetime import datetime
 import pandas as pd
-from utils.db_init import get_db
+from utils.db import get_db
 
 bp = Blueprint('attendance', __name__)
 

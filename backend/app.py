@@ -44,14 +44,7 @@ os.makedirs('database', exist_ok=True)
 os.makedirs('storage/models', exist_ok=True)
 
 # Initialize database connection based on environment
-if os.getenv('TURSO_DATABASE_URL'):
-    from utils.db_turso import init_db, get_db
-    print("📊 Using Turso (Cloud SQLite)")
-    DB_TYPE = 'turso'
-else:
-    from utils.db_init import init_db, get_db
-    print("📊 Using Local SQLite")
-    DB_TYPE = 'local'
+from utils.db import get_db, DB_TYPE, init_db
 
 # Initialize database on startup
 def initialize_database():
