@@ -6,7 +6,7 @@ export MALLOC_ARENA_MAX=2
 export PYTHONUNBUFFERED=1
 
 # Start gunicorn with optimized settings
-exec gunicorn backend.app:app \
+exec gunicorn app:app \
   --worker-class gevent \
   --workers 1 \
   --threads 2 \
