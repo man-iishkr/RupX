@@ -3,7 +3,7 @@ Turso (Cloud SQLite) Database Connection
 Uses libsql for compatibility with Render deployment
 Properly handles both tuple and dict returns
 """
-import libsql_client as libsql
+import libsql_client 
 import os
 from dotenv import load_dotenv
 
@@ -96,16 +96,16 @@ class TursoCursor:
 
 
 def get_db():
-    """Get Turso database connection"""
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
-        raise ValueError("Turso credentials not configured. Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN")
+        raise ValueError("Turso credentials not configured.")
     
     try:
-        conn = libsql.connect(
-            database=TURSO_DATABASE_URL,
+        # CRITICAL FIX: Use create_client_sync
+        client = libsql_client.create_client_sync(
+            url=TURSO_DATABASE_URL,
             auth_token=TURSO_AUTH_TOKEN
         )
-        return TursoConnection(conn)
+        return TursoConnection(client)
     except Exception as e:
         print(f"❌ Error connecting to Turso: {e}")
         raise

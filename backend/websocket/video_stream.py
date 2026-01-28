@@ -222,3 +222,27 @@ def mark_attendance(person_name, attendance_path):
     except Exception as e:
         print(f"❌ Failed to mark attendance: {str(e)}")
         return False
+    
+def get_recognition_status(user_id, project_id):
+    """Bridge for recognize.py to check if a session is active"""
+    session_key = f"{user_id}_{project_id}"
+    if session_key in recognition_sessions:
+        return {
+            'active': True,
+            'started_at': recognition_sessions[session_key]['started_at'],
+            'marked_count': len(recognition_sessions[session_key]['marked_today'])
+        }
+    return {'active': False}
+
+def start_recognition_session(user_id, project_id):
+    """Allows programmatic start if needed by recognize.py"""
+    # This can remain a placeholder or call handle_start_recognition logic
+    pass
+
+def stop_recognition_session(user_id, project_id):
+    """Allows programmatic stop if needed by recognize.py"""
+    session_key = f"{user_id}_{project_id}"
+    if session_key in recognition_sessions:
+        del recognition_sessions[session_key]
+        return True
+    return False
