@@ -3,7 +3,7 @@ Turso (Cloud SQLite) Database Connection
 Uses libsql for compatibility with Render deployment
 Properly handles both tuple and dict returns
 """
-import libsql
+import libsql_client as libsql
 import os
 from dotenv import load_dotenv
 
