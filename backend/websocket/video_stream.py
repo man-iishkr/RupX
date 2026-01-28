@@ -1,346 +1,224 @@
 """
-WebSocket video streaming with face recognition
-FIXED: Embeddings loading issue
+WebSocket Video Stream Handler
+Modified: Receives embeddings from client instead of images
 """
-import cv2
+
+import json
 import numpy as np
-import base64
-import threading
-import time
+import os
 from datetime import datetime
 import pandas as pd
-from queue import Queue, Empty
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ml.face_embedding import get_model
-from ml.recognition_core import FaceTracker
-from flask import request
-
-# Global state
-socketio = None
 recognition_sessions = {}
-session_lock = threading.Lock()
 
-def init_socketio(sio):
-    """Initialize SocketIO instance"""
-    global socketio
-    socketio = sio
+def init_socketio(socketio_instance):
+    """Initialize WebSocket handlers"""
     
-    @socketio.on('connect')
+    @socketio_instance.on('connect')
     def handle_connect():
-        print(f"Client connected: {request.sid}")
+        print(f"✅ Client connected")
+        socketio_instance.emit('connection_status', {
+            'status': 'connected',
+            'message': 'Connected to server'
+        })
     
-    @socketio.on('disconnect')
+    @socketio_instance.on('disconnect')
     def handle_disconnect():
-        print(f"Client disconnected: {request.sid}")
+        print("❌ Client disconnected")
     
-    @socketio.on('start_stream')
-    def handle_start_stream(data):
-        """Start video streaming"""
+    @socketio_instance.on('start_recognition')
+    def handle_start_recognition(data):
+        """Start recognition session"""
         user_id = data.get('user_id')
         project_id = data.get('project_id')
         
         if not user_id or not project_id:
-            socketio.emit('error', {'message': 'Invalid session'}, room=request.sid)
+            socketio_instance.emit('recognition_error', {
+                'error': 'Missing user_id or project_id'
+            })
             return
         
-        key = f"{user_id}_{project_id}"
+        session_key = f"{user_id}_{project_id}"
         
-        with session_lock:
-            if key in recognition_sessions:
-                session = recognition_sessions[key]
-                session['clients'].add(request.sid)
-                socketio.emit('stream_started', {}, room=request.sid)
-            else:
-                socketio.emit('error', {'message': 'Recognition not started'}, room=request.sid)
-    
-    @socketio.on('stop_stream')
-    def handle_stop_stream(data):
-        """Stop video streaming"""
-        user_id = data.get('user_id')
-        project_id = data.get('project_id')
+        # Load embeddings
+        embeddings_file = f'storage/users/{user_id}/projects/{project_id}/models/embeddings.json'
+        attendance_file = f'storage/users/{user_id}/projects/{project_id}/attendance/attendance.xlsx'
         
-        if not user_id or not project_id:
+        if not os.path.exists(embeddings_file):
+            socketio_instance.emit('recognition_error', {
+                'error': 'Model not trained. Please train first.'
+            })
             return
         
-        key = f"{user_id}_{project_id}"
-        
-        with session_lock:
-            if key in recognition_sessions:
-                session = recognition_sessions[key]
-                if request.sid in session['clients']:
-                    session['clients'].remove(request.sid)
-    
-    @socketio.on('video_frame')
-    def handle_video_frame(data):
-        """Process incoming video frame"""
-        user_id = data.get('user_id')
-        project_id = data.get('project_id')
-        frame_data = data.get('frame')
-        
-        if not all([user_id, project_id, frame_data]):
+        if not os.path.exists(attendance_file):
+            socketio_instance.emit('recognition_error', {
+                'error': 'Attendance file not found'
+            })
             return
         
-        key = f"{user_id}_{project_id}"
+        # Load embeddings from JSON
+        with open(embeddings_file, 'r') as f:
+            embeddings_data = json.load(f)
         
-        with session_lock:
-            if key not in recognition_sessions:
-                return
-            
-            session = recognition_sessions[key]
-            
-            if not session['running']:
-                return
-        
-        try:
-            # Decode frame
-            frame_bytes = base64.b64decode(frame_data.split(',')[1])
-            nparr = np.frombuffer(frame_bytes, np.uint8)
-            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            
-            if frame is None:
-                return
-            
-            # Add to processing queue
-            if not session['frame_queue'].full():
-                session['frame_queue'].put({
-                    'frame': frame,
-                    'timestamp': time.time()
-                })
-        
-        except Exception as e:
-            print(f"Error processing frame: {e}")
-
-def start_recognition_session(user_id, project_id, embeddings_path, attendance_path, attendance_mode):
-    """Start recognition session"""
-    global recognition_sessions
-    
-    key = f"{user_id}_{project_id}"
-    
-    with session_lock:
-        if key in recognition_sessions and recognition_sessions[key]['running']:
-            return False
-        
-        # Load embeddings - FIX: Handle new format with metadata
-        try:
-            data = np.load(embeddings_path, allow_pickle=True).item()
-            
-            # Check if it's the new format with 'embeddings' key
-            if isinstance(data, dict) and 'embeddings' in data:
-                embeddings = data['embeddings']
-            else:
-                # Old format - direct embeddings dict
-                embeddings = data
-            
-            print(f"Loaded {len(embeddings)} embeddings")
-            
-        except Exception as e:
-            print(f"Error loading embeddings: {e}")
-            return False
-        
-        # Load attendance
-        attendance_df = pd.read_excel(attendance_path, engine='openpyxl')
-        
-        # Get already marked names
-        marked_today = set()
-        today = datetime.now().strftime('%Y-%m-%d')
-        if today in attendance_df.columns:
-            for idx, row in attendance_df.iterrows():
-                if not pd.isna(row[today]) and row[today] != "":
-                    marked_today.add(row["NAME"])
-        
-        # Create session
-        session = {
+        recognition_sessions[session_key] = {
             'user_id': user_id,
             'project_id': project_id,
-            'embeddings': embeddings,
-            'attendance_df': attendance_df,
-            'attendance_path': attendance_path,
-            'attendance_mode': attendance_mode,
-            'marked_today': marked_today,
-            'running': True,
-            'clients': set(),
-            'frame_queue': Queue(maxsize=2),
-            'tracker': FaceTracker()
+            'embeddings': embeddings_data['embeddings'],
+            'attendance_path': attendance_file,
+            'marked_today': set(),
+            'started_at': datetime.now().isoformat()
         }
         
-        recognition_sessions[key] = session
+        socketio_instance.emit('recognition_started', {
+            'success': True,
+            'num_identities': len(embeddings_data['embeddings']),
+            'message': 'Recognition started'
+        })
         
-        # Start processing thread
-        thread = threading.Thread(
-            target=recognition_worker,
-            args=(key,),
-            daemon=True
-        )
-        thread.start()
+        print(f"🎯 Recognition started for user {user_id}, project {project_id}")
+    
+    @socketio_instance.on('recognize_embedding')
+    def handle_recognize_embedding(data):
+        """Receive and compare embedding from client"""
+        user_id = data.get('user_id')
+        project_id = data.get('project_id')
+        embedding = data.get('embedding')
         
-        return True
-
-def stop_recognition_session(user_id, project_id):
-    """Stop recognition session"""
-    global recognition_sessions
-    
-    key = f"{user_id}_{project_id}"
-    
-    with session_lock:
-        if key in recognition_sessions:
-            recognition_sessions[key]['running'] = False
-            # Will be cleaned up by worker thread
-
-def get_recognition_status(user_id, project_id):
-    """Get recognition session status"""
-    key = f"{user_id}_{project_id}"
-    
-    with session_lock:
-        if key in recognition_sessions and recognition_sessions[key]['running']:
-            session = recognition_sessions[key]
-            return {
-                'running': True,
-                'marked_today': list(session['marked_today']),
-                'tracked_faces': session['tracker'].get_tracked_count()
-            }
-        else:
-            return {
-                'running': False,
-                'marked_today': [],
-                'tracked_faces': 0
-            }
-
-def mark_attendance(session, name):
-    """Mark attendance for recognized person"""
-    today = datetime.now().strftime('%Y-%m-%d')
-    current_time = datetime.now().strftime('%H:%M:%S')
-    
-    df = session['attendance_df']
-    attendance_mode = session['attendance_mode']
-    
-    # Check if already marked based on mode
-    if attendance_mode == 'daily':
-        # Daily mode: Check if marked today
-        if name in session['marked_today']:
-            return False
-    elif attendance_mode == 'sessional':
-        # Sessional mode: Check if marked this session (always check marked_today for current session)
-        if name in session['marked_today']:
-            return False
-    
-    # Check if name exists
-    if name not in df["NAME"].values:
-        return False
-    
-    # Add column if not exists
-    if today not in df.columns:
-        df[today] = ""
-    
-    # Mark attendance
-    row_index = df[df["NAME"] == name].index[0]
-    
-    # For sessional mode, append time if already marked today
-    if attendance_mode == 'sessional':
-        current_value = df.at[row_index, today]
-        if pd.isna(current_value) or current_value == "":
-            df.at[row_index, today] = current_time
-        else:
-            # Append new time (sessional)
-            df.at[row_index, today] = f"{current_value}, {current_time}"
-    else:
-        # Daily mode - mark only once
-        if pd.isna(df.at[row_index, today]) or df.at[row_index, today] == "":
-            df.at[row_index, today] = current_time
-        else:
-            return False  # Already marked today
-    
-    df.to_excel(session['attendance_path'], index=False, engine='openpyxl')
-    session['marked_today'].add(name)
-    
-    mode_text = "session" if attendance_mode == 'sessional' else "day"
-    print(f"✅ {name} marked at {current_time} ({mode_text})")
-    
-    # Emit to all clients
-    if socketio:
-        key = f"{session['user_id']}_{session['project_id']}"
-        for client_id in session['clients']:
-            socketio.emit('attendance_marked', {
-                'name': name,
-                'time': current_time,
-                'mode': attendance_mode
-            }, room=client_id)
-    
-    return True
-
-def recognition_worker(session_key):
-    """Background thread for face recognition"""
-    global recognition_sessions
-    
-    print(f"Recognition worker started for {session_key}")
-    
-    # Get model
-    model = get_model()
-    
-    frame_count = 0
-    PROCESS_EVERY_N_FRAMES = 3
-    
-    while True:
-        with session_lock:
-            if session_key not in recognition_sessions:
-                break
-            
-            session = recognition_sessions[session_key]
-            
-            if not session['running']:
-                # Cleanup
-                del recognition_sessions[session_key]
-                print(f"Recognition worker stopped for {session_key}")
-                break
+        if not user_id or not project_id or not embedding:
+            socketio_instance.emit('recognition_error', {
+                'error': 'Missing required data'
+            })
+            return
         
+        session_key = f"{user_id}_{project_id}"
+        
+        if session_key not in recognition_sessions:
+            socketio_instance.emit('recognition_error', {
+                'error': 'Recognition not started'
+            })
+            return
+        
+        session_data = recognition_sessions[session_key]
+        
+        # Convert to numpy
         try:
-            # Get frame from queue
-            frame_data = session['frame_queue'].get(timeout=0.5)
-            frame = frame_data['frame']
-            frame_count += 1
+            detected_embedding = np.array(embedding, dtype=np.float32)
             
-            # Skip frames for performance
-            if frame_count % PROCESS_EVERY_N_FRAMES != 0:
-                continue
+            if detected_embedding.shape[0] != 512:
+                socketio_instance.emit('recognition_error', {
+                    'error': f'Invalid embedding dimension: {detected_embedding.shape[0]}'
+                })
+                return
             
-            # Detect faces
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            faces = model.get(frame_rgb)
+            # Normalize
+            detected_embedding = detected_embedding / np.linalg.norm(detected_embedding)
             
-            if faces:
-                # Prepare detected faces
-                detected_faces = []
-                for face in faces:
-                    bbox = face.bbox.astype(int)
-                    x1, y1, x2, y2 = bbox
-                    
-                    # Clamp to frame boundaries
-                    x1 = max(0, min(x1, frame.shape[1] - 1))
-                    y1 = max(0, min(y1, frame.shape[0] - 1))
-                    x2 = max(0, min(x2, frame.shape[1]))
-                    y2 = max(0, min(y2, frame.shape[0]))
-                    
-                    bbox_final = (x1, y1, x2, y2)
-                    embedding = face.normed_embedding
-                    
-                    detected_faces.append((bbox_final, embedding))
-                
-                # Update tracker
-                recognized = session['tracker'].update(detected_faces, session['embeddings'])
-                
-                # Mark attendance
-                for face_id, bbox, name, score in recognized:
-                    if name != "Unknown" and score > 0.38:
-                        mark_attendance(session, name)
-            
-        except Empty:
-            continue
         except Exception as e:
-            print(f"Recognition worker error: {e}")
-            import traceback
-            traceback.print_exc()
-            time.sleep(0.1)
+            socketio_instance.emit('recognition_error', {
+                'error': f'Failed to process embedding: {str(e)}'
+            })
+            return
+        
+        # Compare with stored embeddings
+        recognized_persons = []
+        
+        for stored_person in session_data['embeddings']:
+            stored_embedding = np.array(stored_person['embedding'], dtype=np.float32)
+            stored_embedding = stored_embedding / np.linalg.norm(stored_embedding)
+            
+            # Calculate cosine similarity
+            similarity = cosine_similarity(detected_embedding, stored_embedding)
+            
+            if similarity > 0.6:  # Match threshold
+                person_name = stored_person['name']
+                
+                # Check if already marked today
+                today = datetime.now().strftime('%Y-%m-%d')
+                mark_key = f"{person_name}_{today}"
+                
+                if mark_key not in session_data['marked_today']:
+                    # Mark attendance
+                    success = mark_attendance(person_name, session_data['attendance_path'])
+                    
+                    if success:
+                        session_data['marked_today'].add(mark_key)
+                        recognized_persons.append({
+                            'name': person_name,
+                            'confidence': float(similarity),
+                            'timestamp': datetime.now().isoformat(),
+                            'newly_marked': True
+                        })
+                else:
+                    recognized_persons.append({
+                        'name': person_name,
+                        'confidence': float(similarity),
+                        'timestamp': datetime.now().isoformat(),
+                        'newly_marked': False
+                    })
+        
+        # Send results
+        if recognized_persons:
+            socketio_instance.emit('face_recognized', {
+                'persons': recognized_persons
+            })
     
-    print(f"Recognition worker exited for {session_key}")
+    @socketio_instance.on('stop_recognition')
+    def handle_stop_recognition(data):
+        """Stop recognition session"""
+        user_id = data.get('user_id')
+        project_id = data.get('project_id')
+        
+        session_key = f"{user_id}_{project_id}"
+        
+        if session_key in recognition_sessions:
+            marked_count = len(recognition_sessions[session_key]['marked_today'])
+            del recognition_sessions[session_key]
+            
+            socketio_instance.emit('recognition_stopped', {
+                'success': True,
+                'message': f'Recognition stopped. Marked {marked_count} today.'
+            })
+            
+            print(f"🛑 Recognition stopped")
+
+def cosine_similarity(emb1, emb2):
+    """Calculate cosine similarity"""
+    dot_product = np.dot(emb1, emb2)
+    norm_a = np.linalg.norm(emb1)
+    norm_b = np.linalg.norm(emb2)
+    
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    
+    return dot_product / (norm_a * norm_b)
+
+def mark_attendance(person_name, attendance_path):
+    """Mark attendance in Excel"""
+    try:
+        df = pd.read_excel(attendance_path)
+        today = datetime.now().strftime('%Y-%m-%d')
+        time_now = datetime.now().strftime('%I:%M %p')
+        
+        # Add date column if needed
+        if today not in df.columns:
+            df[today] = ''
+        
+        # Find person row
+        person_rows = df[df['NAME'] == person_name].index
+        
+        if len(person_rows) == 0:
+            print(f"⚠️  Person '{person_name}' not found")
+            return False
+        
+        person_row = person_rows[0]
+        df.at[person_row, today] = time_now
+        
+        # Save
+        df.to_excel(attendance_path, index=False, engine='openpyxl')
+        
+        print(f"✅ Marked: {person_name} at {time_now}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Failed to mark attendance: {str(e)}")
+        return False

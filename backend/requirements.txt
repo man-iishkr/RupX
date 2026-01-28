@@ -1,45 +1,15 @@
-# --- Web & Infrastructure ---
+# RupX Backend - Lightweight Requirements
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-SocketIO==5.3.4
+python-socketio==5.9.0
+libsql-client==0.3.0
+numpy==1.24.3
+pandas==2.1.0
+openpyxl==3.1.2
+Pillow==10.1.0
+bcrypt==4.0.1
 gunicorn==21.2.0
-gevent
-gevent-websocket
-Flask==3.1.2
-Flask-SocketIO>=5.5.0
-Flask-CORS==6.0.2
-python-socketio
-python-engineio
-Werkzeug==3.1.3
-setuptools
-Cython
-python-dotenv
-
-# --- AI & Computer Vision (Core) ---
-# We keep numpy below 2.0.0 because many ML libs aren't ready for 2.0 yet
-numpy>=1.24.0,<2.0.0
-opencv-python-headless
-insightface==0.7.3
-onnx
-onnxruntime
-ml-dtypes>=0.2.0
-tensorflow>=2.13.0
-mtcnn
-scikit-learn
-scikit-image
-scipy
-
-# --- Image Processing & Data ---
-Pillow
-albumentations
-imageio
-matplotlib
-pandas
-
-# --- Utilities & Security ---
-bcrypt
-requests
-pydantic
-tqdm
-easydict
-pyyaml
-coloredlogs
-humanfriendly
-libsql==0.1.11
+gevent==23.9.1
+gevent-websocket==0.10.1
+python-dotenv==1.0.0

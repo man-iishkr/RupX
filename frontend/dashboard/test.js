@@ -1,267 +1,275 @@
-// Face Recognition Testing with WebSocket
-// const API_BASE = "http://127.0.0.1:5000/api";
+// test.js - Updated for client-side ML processing
+// REPLACE YOUR CURRENT test.js WITH THIS FILE
 
 let socket = null;
 let webcamStream = null;
-let isRecognizing = false;
-let userId = null;
-let projectId = null;
-let frameInterval = null;
+let recognitionActive = false;
+let mlClient = null;
+let markedToday = [];
 
-// Check if model is trained
-window.addEventListener('DOMContentLoaded', async () => {
-    await checkModelTrained();
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkModelStatus();
 });
 
-// Check if model is trained
-async function checkModelTrained() {
+async function checkModelStatus() {
     try {
-        const response = await fetch(`${API_BASE}/train/status`, {
+        const response = await fetch(`${API_BASE_URL}/api/train/status`, {
             credentials: 'include'
         });
         
         const data = await response.json();
         
-        if (data.model_trained) {
-            document.getElementById('recognition-container').style.display = 'block';
-            document.getElementById('not-trained-message').style.display = 'none';
-            await initializeWebcam();
-            await loadMarkedToday();
-        } else {
-            document.getElementById('recognition-container').style.display = 'none';
+        if (!data.model_trained) {
             document.getElementById('not-trained-message').style.display = 'block';
+            document.getElementById('recognition-container').style.display = 'none';
+        } else {
+            document.getElementById('not-trained-message').style.display = 'none';
+            document.getElementById('recognition-container').style.display = 'block';
+            
+            // Initialize ML Client
+            await initializeMLClient();
         }
     } catch (error) {
         console.error('Failed to check model status:', error);
-        showAlert('Failed to load status', 'error');
+        showAlert('Failed to check model status', 'error');
     }
 }
 
-// Initialize webcam
-async function initializeWebcam() {
+async function initializeMLClient() {
     try {
-        const video = document.getElementById('webcam');
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: 640 },
-                height: { ideal: 480 }
-            }
+        console.log('Loading TensorFlow.js models...');
+        
+        mlClient = new MLClient();
+        const result = await mlClient.initialize((progress) => {
+            console.log(`Loading models... ${progress.progress}% - ${progress.message}`);
         });
         
-        video.srcObject = stream;
-        webcamStream = stream;
-    } catch (error) {
-        console.error('Webcam error:', error);
-        showAlert('Failed to access webcam. Please check permissions.', 'error');
-    }
-}
-
-// Start recognition
-async function startRecognition() {
-    if (isRecognizing) return;
-    
-    try {
-        // Start recognition session on backend
-        const response = await fetch(`${API_BASE}/recognize/start`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            showAlert(data.error || 'Failed to start recognition', 'error');
-            return;
+        if (!result.success) {
+            showAlert(`Failed to load ML models: ${result.error}`, 'error');
+            return false;
         }
         
-        isRecognizing = true;
+        console.log('ML models loaded successfully');
+        return true;
         
-        // Update UI
+    } catch (error) {
+        console.error('Failed to initialize ML client:', error);
+        showAlert('Failed to load face recognition models', 'error');
+        return false;
+    }
+}
+
+async function startRecognition() {
+    try {
+        // Make sure ML Client is ready
+        if (!mlClient || !mlClient.isReady) {
+            showAlert('Loading ML models, please wait...', 'info');
+            const success = await initializeMLClient();
+            if (!success) return;
+        }
+        
+        // Start webcam
+        webcamStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480, facingMode: 'user' }
+        });
+        
+        const video = document.getElementById('webcam');
+        video.srcObject = webcamStream;
+        
+        // Wait for video to be ready
+        await new Promise(resolve => {
+            video.onloadedmetadata = resolve;
+        });
+        
+        // Connect to WebSocket
+        await connectWebSocket();
+        
+        // Start recognition loop
+        recognitionActive = true;
         document.getElementById('start-btn').style.display = 'none';
         document.getElementById('stop-btn').style.display = 'inline-block';
         
-        // Initialize WebSocket
-        initializeWebSocket();
+        processFrames();
         
-        // Start sending frames
-        startFrameCapture();
-        
-        showAlert('Recognition started', 'success');
     } catch (error) {
-        console.error('Start recognition error:', error);
-        showAlert('Network error', 'error');
+        console.error('Failed to start recognition:', error);
+        if (error.name === 'NotAllowedError') {
+            showAlert('Camera access denied. Please allow camera access and try again.', 'error');
+        } else {
+            showAlert('Failed to start recognition: ' + error.message, 'error');
+        }
     }
 }
 
-// Stop recognition
-async function stopRecognition() {
-    if (!isRecognizing) return;
-    
-    try {
-        // Stop frame capture
-        if (frameInterval) {
-            clearInterval(frameInterval);
-            frameInterval = null;
-        }
-        
-        // Disconnect WebSocket
-        if (socket) {
-            socket.disconnect();
-            socket = null;
-        }
-        
-        // Stop recognition session on backend
-        await fetch(`${API_BASE}/recognize/stop`, {
-            method: 'POST',
-            credentials: 'include'
+async function connectWebSocket() {
+    return new Promise((resolve, reject) => {
+        socket = io(API_BASE_URL, {
+            withCredentials: true,
+            transports: ['websocket']
         });
         
-        isRecognizing = false;
+        socket.on('connect', () => {
+            console.log('✅ WebSocket connected');
+            
+            // Start recognition session on backend
+            socket.emit('start_recognition', {
+                user_id: window.currentUser?.id,
+                project_id: window.activeProject?.id
+            });
+        });
         
-        // Update UI
-        document.getElementById('start-btn').style.display = 'inline-block';
-        document.getElementById('stop-btn').style.display = 'none';
+        socket.on('recognition_started', (data) => {
+            console.log('🎯 Recognition session started:', data);
+            resolve();
+        });
         
-        showAlert('Recognition stopped', 'success');
-    } catch (error) {
-        console.error('Stop recognition error:', error);
-    }
-}
-
-// Initialize WebSocket connection
-function initializeWebSocket() {
-    socket = io('http://127.0.0.1:5000');
-    
-    socket.on('connect', () => {
-        console.log('WebSocket connected');
-        
-        // Get user/project info from session
-        fetch(`${API_BASE}/auth/status`, { credentials: 'include' })
-            .then(res => res.json())
-            .then(data => {
-                if (data.authenticated) {
-                    userId = data.user.id;
-                    
-                    // Get active project
-                    return fetch(`${API_BASE}/auth/projects`, { credentials: 'include' });
-                }
-            })
-            .then(res => res.json())
-            .then(data => {
-                const activeProject = data.projects.find(p => p.is_active);
-                if (activeProject) {
-                    projectId = activeProject.id;
-                    
-                    // Start stream
-                    socket.emit('start_stream', {
-                        user_id: userId,
-                        project_id: projectId
-                    });
+        socket.on('face_recognized', (data) => {
+            console.log('✅ Face recognized:', data);
+            data.persons.forEach(person => {
+                if (person.newly_marked) {
+                    addToMarkedList(person.name, person.confidence);
                 }
             });
-    });
-    
-    socket.on('stream_started', () => {
-        console.log('Stream started');
-    });
-    
-    socket.on('attendance_marked', (data) => {
-        console.log('Attendance marked:', data);
-        addMarkedPerson(data.name, data.time);
-        showAlert(`✓ ${data.name} marked at ${data.time}`, 'success');
-    });
-    
-    socket.on('error', (data) => {
-        console.error('WebSocket error:', data);
-        showAlert(data.message, 'error');
-    });
-    
-    socket.on('disconnect', () => {
-        console.log('WebSocket disconnected');
+        });
+        
+        socket.on('recognition_error', (data) => {
+            console.error('❌ Recognition error:', data);
+            showAlert(`Recognition error: ${data.error}`, 'error');
+            reject(new Error(data.error));
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('WebSocket connection error:', error);
+            reject(error);
+        });
     });
 }
 
-// Start capturing and sending frames
-function startFrameCapture() {
-    const video = document.getElementById('webcam');
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+async function processFrames() {
+    if (!recognitionActive) return;
     
-    // Send frame every 300ms (3-4 fps)
-    frameInterval = setInterval(() => {
-        if (!video.videoWidth || !video.videoHeight) return;
+    try {
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('overlay');
+        const ctx = canvas.getContext('2d');
         
         // Set canvas size to match video
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
-        // Draw current frame
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Clear previous drawings
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Convert to base64
-        const frameData = canvas.toDataURL('image/jpeg', 0.8);
+        // Detect faces using TensorFlow.js
+        const faces = await mlClient.detectFaces(video);
         
-        // Send via WebSocket
-        if (socket && socket.connected) {
-            socket.emit('video_frame', {
-                user_id: userId,
-                project_id: projectId,
-                frame: frameData
+        // Draw bounding boxes
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 3;
+        ctx.font = '16px Arial';
+        ctx.fillStyle = '#00ff00';
+        
+        for (const face of faces) {
+            // Draw rectangle
+            ctx.strokeRect(face.box.x, face.box.y, face.box.width, face.box.height);
+            
+            // Draw confidence
+            ctx.fillText(
+                `${Math.round(face.confidence * 100)}%`,
+                face.box.x,
+                face.box.y - 5
+            );
+            
+            // Generate embedding and send to backend
+            const embedding = await mlClient.generateEmbedding(video, face.box);
+            
+            socket.emit('recognize_embedding', {
+                embedding: embedding,
+                user_id: window.currentUser?.id,
+                project_id: window.activeProject?.id,
+                timestamp: new Date().toISOString()
             });
         }
-    }, 300);
-}
-
-// Load today's marked attendance
-async function loadMarkedToday() {
-    try {
-        const response = await fetch(`${API_BASE}/attendance/today`, {
-            credentials: 'include'
-        });
         
-        const data = await response.json();
-        
-        if (data.marked && data.marked.length > 0) {
-            const markedList = document.getElementById('marked-list');
-            markedList.innerHTML = data.marked.map(item => `
-                <div class="attendance-item">
-                    <span class="attendance-name">${item.name}</span>
-                    <span class="attendance-time">${item.time}</span>
-                </div>
-            `).join('');
-        }
     } catch (error) {
-        console.error('Failed to load marked attendance:', error);
+        console.error('Frame processing error:', error);
     }
+    
+    // Continue processing frames (10 FPS)
+    setTimeout(processFrames, 100);
 }
 
-// Add newly marked person to list
-function addMarkedPerson(name, time) {
+function stopRecognition() {
+    recognitionActive = false;
+    
+    // Stop webcam
+    if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+        const video = document.getElementById('webcam');
+        video.srcObject = null;
+    }
+    
+    // Disconnect WebSocket
+    if (socket) {
+        socket.emit('stop_recognition', {
+            user_id: window.currentUser?.id,
+            project_id: window.activeProject?.id
+        });
+        socket.disconnect();
+        socket = null;
+    }
+    
+    // Clear canvas
+    const canvas = document.getElementById('overlay');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Update buttons
+    document.getElementById('start-btn').style.display = 'inline-block';
+    document.getElementById('stop-btn').style.display = 'none';
+}
+
+function addToMarkedList(name, confidence) {
+    if (markedToday.includes(name)) return;
+    
+    markedToday.push(name);
+    
     const markedList = document.getElementById('marked-list');
     
-    // Remove "no one marked" message if exists
+    // Remove "no one marked" message if it exists
     if (markedList.querySelector('p')) {
         markedList.innerHTML = '';
     }
     
-    // Add new item at top
     const item = document.createElement('div');
-    item.className = 'attendance-item';
+    item.className = 'marked-item';
     item.innerHTML = `
-        <span class="attendance-name">${name}</span>
-        <span class="attendance-time">${time}</span>
+        <div class="marked-info">
+            <strong>${name}</strong>
+            <span class="confidence">${Math.round(confidence * 100)}% match</span>
+        </div>
+        <div class="marked-time">${new Date().toLocaleTimeString()}</div>
     `;
     
-    markedList.insertBefore(item, markedList.firstChild);
+    markedList.prepend(item);
+    
+    // Add animation
+    item.style.animation = 'slideIn 0.3s ease-out';
 }
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
-    if (isRecognizing) {
+    if (recognitionActive) {
         stopRecognition();
     }
-    
-    if (webcamStream) {
-        webcamStream.getTracks().forEach(track => track.stop());
+    if (mlClient) {
+        mlClient.cleanup();
     }
 });
+
+function showAlert(message, type = 'info') {
+    // Use your existing alert system
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    alert(message);
+}
