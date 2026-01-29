@@ -1,6 +1,7 @@
 """
 Turso (Cloud SQLite) Database Connection
 Fixed: Maps libsql_client sync methods to standard cursor-like behavior
+Added: lastrowid support for compatibility with backend inserts
 """
 import libsql_client 
 import os
@@ -12,7 +13,7 @@ TURSO_DATABASE_URL = os.getenv('TURSO_DATABASE_URL')
 TURSO_AUTH_TOKEN = os.getenv('TURSO_AUTH_TOKEN')
 
 if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
-    print("⚠️  Warning: TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not set")
+    print(" Warning: TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not set")
 
 class TursoConnection:
     """Wrapper for libsql_client to simulate a standard DB-API connection"""
@@ -48,6 +49,7 @@ class TursoCursor:
         self._client = client
         self.description = None
         self.rowcount = -1
+        self.lastrowid = None  # Added to fix AttributeError
         self._results = []
     
     def _to_dict(self, row, columns):
@@ -65,11 +67,15 @@ class TursoCursor:
             self.description = [[col] for col in res.columns]
             self.rowcount = len(res.rows)
             
+            # CRITICAL FIX: Capture the last inserted row ID for the backend
+            if hasattr(res, 'last_insert_rowid'):
+                self.lastrowid = res.last_insert_rowid
+            
             # Convert all rows to dicts immediately for fetchone/fetchall
             self._results = [self._to_dict(row, res.columns) for row in res.rows]
             return res
         except Exception as e:
-            print(f"❌ Execute error: {e}")
+            print(f"Execute error: {e}")
             print(f"   Query: {query[:100]}")
             raise
     
@@ -80,7 +86,7 @@ class TursoCursor:
             for stmt in statements:
                 self._client.execute(stmt)
         except Exception as e:
-            print(f"❌ Script error: {e}")
+            print(f" Script error: {e}")
             raise
     
     def fetchone(self):
@@ -114,11 +120,8 @@ def get_db():
         )
         return TursoConnection(client)
     except Exception as e:
-        print(f"❌ Error connecting to Turso: {e}")
+        print(f"Error connecting to Turso: {e}")
         raise
-
-# Keep all your existing init_db, verify_connection, and __main__ logic below...
-# They will now work because conn.cursor() is no longer an AttributeError.
 
 def init_db():
     """Initialize Turso database with schema"""
@@ -144,11 +147,11 @@ def init_db():
                 cursor.execute(statement)
             except Exception as stmt_error:
                 if 'already exists' in str(stmt_error).lower(): continue
-                print(f"⚠️  Warning on statement {i+1}: {stmt_error}")
+                print(f" Warning on statement {i+1}: {stmt_error}")
         
-        print("✅ Schema executed successfully")
+        print(" Schema executed successfully")
     except Exception as e:
-        print(f"❌ Error initializing database: {e}")
+        print(f"Error initializing database: {e}")
         raise
     finally:
         if cursor: cursor.close()
@@ -165,12 +168,11 @@ def verify_connection():
         conn.close()
         return result.get('test') == 1 if isinstance(result, dict) else result[0] == 1
     except Exception as e:
-        print(f"❌ Connection test failed: {e}")
+        print(f"Connection test failed: {e}")
         return False
 
 if __name__ == '__main__':
-    # ... rest of your testing code remains the same ...
     print("\n🔍 Testing connection...")
     if verify_connection():
-        print("✅ Connection OK")
+        print("Connection OK")
         init_db()
