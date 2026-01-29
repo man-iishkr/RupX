@@ -3,6 +3,23 @@
 
 // const API_BASE_URL = 'https://rupx-backend.onrender.com/api';  
 
+// Add to the top of projects.js
+function showCreateModal() {
+    const modal = document.getElementById('create-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function hideCreateModal() {
+    const modal = document.getElementById('create-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function handleModalClick(event) {
+    if (event.target.id === 'create-modal') {
+        hideCreateModal();
+    }
+}
+
 let projects = [];
 
 // Load projects on page load
@@ -205,8 +222,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loadProjects();
     
     // Attach form handler if form exists
-    const createForm = document.getElementById('create-project-form');
+    const createForm = document.getElementById('create-form');
     if (createForm) {
         createForm.addEventListener('submit', createProject);
     }
 });
+
+
+window.showCreateModal = showCreateModal;
+window.hideCreateModal = hideCreateModal;
+window.activateProject = activateProject;
+window.deleteProject = deleteProject;
+window.handleModalClick = handleModalClick;
