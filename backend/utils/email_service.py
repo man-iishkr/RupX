@@ -9,6 +9,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 import os
+import requests
 
 # Store OTPs temporarily (in production, use Redis or database)
 otp_storage = {}
@@ -17,31 +18,30 @@ def generate_otp():
     """Generate 6-digit OTP"""
     return ''.join(random.choices(string.digits, k=6))
 
+ 
+
 def send_verification_email(to_email, otp):
     """
-    Send OTP verification email using Brevo SMTP
-    
-    Configure these environment variables in Render:
-    - SMTP_EMAIL: Your registered Brevo sender email
-    - SMTP_PASSWORD: Your Brevo SMTP Key (Master Password)
+    Send OTP verification email using Brevo HTTP API
+    This bypasses SMTP port blocking on Render.
     """
+    api_key = os.getenv('SMTP_PASSWORD') 
+    sender_email = os.getenv('SMTP_EMAIL')
     
-    # Get SMTP credentials from environment variables
-    # For Brevo, the SMTP server is always smtp-relay.brevo.com
-    smtp_server = "smtp-relay.brevo.com"
-    smtp_port = 587
-    smtp_email = os.getenv('SMTP_EMAIL', 'your-brevo-sender@email.com')
-    smtp_password = os.getenv('SMTP_PASSWORD', 'your-brevo-api-key')
+    url = "https://api.brevo.com/v3/smtp/email"
     
-    # Create message
-    message = MIMEMultipart('alternative')
-    message['Subject'] = 'RupX - Verify Your Email'
-    message['From'] = f'RupX <{smtp_email}>'
-    message['To'] = to_email
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": api_key
+    }
     
-    # HTML email body
-    html = f"""
-    <html>
+    payload = {
+        "sender": {"name": "RupX", "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": "RupX - Verify Your Email",
+        "htmlContent": f"""
+            <html>
         <body style="font-family: Arial, sans-serif; background-color: #0a0a0a; color: #ffffff; padding: 20px;">
             <div style="max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%); border-radius: 16px; padding: 40px; border: 1px solid rgba(255, 120, 73, 0.2);">
                 <div style="text-align: center; margin-bottom: 30px;">
@@ -77,26 +77,20 @@ def send_verification_email(to_email, otp):
             </div>
         </body>
     </html>
-    """
-    
-    part = MIMEText(html, 'html')
-    message.attach(part)
-    
-    try:
-        # Connect to Brevo SMTP server
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(smtp_email, smtp_password)
-        
-        server.send_message(message)
-        server.quit()
-        
-        print(f"✅ OTP email sent to {to_email}")
-        return True
-    except Exception as e:
-        print(f"❌ Error sending email via Brevo: {e}")
-        return False
+        """
+    }
 
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code in [201, 200, 202]:
+            print(f"✅ OTP email sent via API to {to_email}")
+            return True
+        else:
+            print(f"❌ Brevo API Error: {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Network error: {e}")
+        return False
 def create_otp(email):
     """Create and store OTP for email"""
     otp = generate_otp()

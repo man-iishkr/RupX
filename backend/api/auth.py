@@ -1,3 +1,4 @@
+import threading
 from flask import Blueprint, request, jsonify, session
 from datetime import datetime
 import bcrypt
@@ -5,6 +6,7 @@ import re
 from utils.db import get_db  # ← Changed from db_init
 from utils.email_service import create_otp, verify_otp, send_verification_email, resend_otp
 import os
+import threading
 
 bp = Blueprint('auth', __name__)
 
@@ -324,9 +326,12 @@ def signup():
         
         # Generate and send OTP
         otp = create_otp(email)
-        success = send_verification_email(email, otp)
+
+# Start email sending in the background
+        email_thread = threading.Thread(target=send_verification_email, args=(email, otp))
+        email_thread.start()
         
-        if not success:
+        if not email_thread.is_alive():
             return jsonify({'error': 'Failed to send verification email'}), 500
         
         # Store password temporarily in session
