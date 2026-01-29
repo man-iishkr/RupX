@@ -56,7 +56,7 @@ async function handleFile(file) {
     formData.append('file', file);
     
     try {
-        const response = await fetch(`${API_BASE}/dataset/upload`, {
+        const response = await fetch(`${API_BASE_URL}/dataset/upload`, {
             method: 'POST',
             credentials: 'include',
             body: formData
@@ -132,7 +132,7 @@ function displayValidationError(details) {
 // Check dataset status on load
 window.addEventListener('DOMContentLoaded', async () => {
     try {
-        const response = await fetch(`${API_BASE}/dataset/status`, {
+        const response = await fetch(`${API_BASE_URL}/dataset/status`, {
             credentials: 'include'
         });
         

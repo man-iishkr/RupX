@@ -1,6 +1,8 @@
 // dashboard.js - Complete file with client-side training
 // Keep all your existing UI code, just modify training section
 
+const API_BASE_URL='https://rupx-backend.onrender.com';
+
 let currentProject = null;
 let mlClient = null;
 

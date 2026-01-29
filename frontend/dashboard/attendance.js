@@ -9,7 +9,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 // Load today's attendance
 async function loadTodayAttendance() {
     try {
-        const response = await fetch(`${API_BASE}/attendance/today`, {
+        const response = await fetch(`${API_BASE_URL}/attendance/today`, {
             credentials: 'include'
         });
         
@@ -39,7 +39,7 @@ async function loadTodayAttendance() {
 // Load attendance statistics
 async function loadAttendanceStats() {
     try {
-        const response = await fetch(`${API_BASE}/attendance/stats`, {
+        const response = await fetch(`${API_BASE_URL}/attendance/stats`, {
             credentials: 'include'
         });
         
@@ -120,7 +120,7 @@ function displayStats(data) {
 // Download attendance Excel
 async function downloadAttendance() {
     try {
-        const response = await fetch(`${API_BASE}/attendance/download`, {
+        const response = await fetch(`${API_BASE_URL}/attendance/download`, {
             credentials: 'include'
         });
         

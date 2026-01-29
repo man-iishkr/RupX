@@ -9,7 +9,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 // Load all projects
 async function loadProjects() {
     try {
-        const response = await fetch(`${API_BASE}/auth/projects`, {
+        const response = await fetch(`${API_BASE_URL}/auth/projects`, {
             credentials: 'include'
         });
         
@@ -98,7 +98,7 @@ document.getElementById('create-form').addEventListener('submit', async (e) => {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/auth/projects/create`, {
+        const response = await fetch(`${API_BASE_URL}/auth/projects/create`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -125,7 +125,7 @@ document.getElementById('create-form').addEventListener('submit', async (e) => {
 // Activate project
 async function activateProject(projectId) {
     try {
-        const response = await fetch(`${API_BASE}/auth/projects/${projectId}/activate`, {
+        const response = await fetch(`${API_BASE_URL}/auth/projects/${projectId}/activate`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -149,7 +149,7 @@ async function deleteProject(projectId) {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/auth/projects/${projectId}`, {
+        const response = await fetch(`${API_BASE_URL}/auth/projects/${projectId}`, {
             method: 'DELETE',
             credentials: 'include'
         });
