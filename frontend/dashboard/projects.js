@@ -1,174 +1,212 @@
-// Projects Management
+// projects.js 
+
+
+const API_BASE_URL = 'https://rupx-backend.onrender.com/api';  
+
 let projects = [];
 
 // Load projects on page load
-window.addEventListener('DOMContentLoaded', async () => {
-    await loadProjects();
-});
-
-// Load all projects
 async function loadProjects() {
     try {
-        const response = await fetch(`${API_BASE_URL}/auth/projects`, {
+        const response = await fetch(`${API_BASE_URL}/auth/projects`, {  
             credentials: 'include'
         });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load projects');
+        }
         
         const data = await response.json();
         projects = data.projects || [];
         
-        displayProjects();
+        displayProjects(projects);
+        
+        // Update active project
+        const active = projects.find(p => p.is_active);
+        if (active) {
+            window.activeProject = active;
+        }
+        
     } catch (error) {
         console.error('Failed to load projects:', error);
-        showAlert('Failed to load projects', 'error');
+        showAlert('Failed to load projects. Please refresh the page.', 'error');
     }
 }
 
-// Display projects
-function displayProjects() {
-    const grid = document.getElementById('projects-grid');
+function displayProjects(projectsList) {
+    const container = document.getElementById('projects-list');
     
-    if (projects.length === 0) {
-        grid.innerHTML = `
-            <div style="grid-column: 1/-1; text-align: center; padding: 4rem; color: var(--text-secondary);">
-                <div style="font-size: 4rem; margin-bottom: 1rem;">📁</div>
-                <h3>No projects yet</h3>
-                <p>Create your first project to get started</p>
-            </div>
-        `;
+    if (!container) {
+        console.warn('Projects list container not found');
         return;
     }
     
-    grid.innerHTML = projects.map(project => `
-        <div class="project-card ${project.is_active ? 'active' : ''}" onclick="activateProject(${project.id})">
+    container.innerHTML = '';
+    
+    if (!projectsList || projectsList.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666; padding: 2rem;">No projects yet. Create your first project!</p>';
+        return;
+    }
+    
+    projectsList.forEach(project => {
+        const card = document.createElement('div');
+        card.className = 'project-card';
+        card.innerHTML = `
             <div class="project-header">
-                <div class="project-name">${project.name}</div>
-                ${project.is_active ? '<div class="project-badge active">Active</div>' : ''}
+                <h3>${escapeHtml(project.name)}</h3>
+                ${project.is_active ? '<span class="badge badge-active">Active</span>' : ''}
             </div>
             <div class="project-info">
-                <div class="info-item">
-                    <span class="status-indicator ${project.dataset_uploaded ? 'success' : ''}"></span>
-                    <span>Dataset ${project.dataset_uploaded ? 'Uploaded' : 'Not Uploaded'}</span>
-                </div>
-                <div class="info-item">
-                    <span class="status-indicator ${project.model_trained ? 'success' : ''}"></span>
-                    <span>Model ${project.model_trained ? 'Trained' : 'Not Trained'}</span>
-                </div>
-                <div class="info-item">
-                    <span>📅</span>
-                    <span>${formatDate(project.created_at)}</span>
-                </div>
+                <p><strong>Mode:</strong> ${escapeHtml(project.attendance_mode || 'Face Recognition')}</p>
+                <p><strong>Dataset:</strong> ${project.dataset_uploaded ? '✅ Uploaded' : '❌ Not uploaded'}</p>
+                <p><strong>Model:</strong> ${project.model_trained ? '✅ Trained' : '❌ Not trained'}</p>
+                <p><strong>Created:</strong> ${formatDate(project.created_at)}</p>
             </div>
             <div class="project-actions">
-                <button class="btn-icon" onclick="event.stopPropagation(); deleteProject(${project.id})" title="Delete">
-                    🗑️
-                </button>
+                ${!project.is_active ? 
+                    `<button onclick="activateProject(${project.id})" class="btn btn-primary">Activate</button>` : 
+                    '<button class="btn btn-secondary" disabled>Active</button>'
+                }
+                <button onclick="deleteProject(${project.id}, '${escapeHtml(project.name)}')" class="btn btn-danger">Delete</button>
             </div>
-        </div>
-    `).join('');
+        `;
+        container.appendChild(card);
+    });
 }
 
-// Show create modal
-function showCreateModal() {
-    if (projects.length >= 5) {
-        showAlert('Maximum 5 projects allowed', 'warning');
+// Create project
+async function createProject(event) {
+    event.preventDefault();
+    
+    const nameInput = document.getElementById('project-name');
+    const modeSelect = document.getElementById('attendance-mode');
+    
+    if (!nameInput || !modeSelect) {
+        console.error('Form elements not found');
         return;
     }
     
-    const modal = document.getElementById('create-modal');
-    modal.classList.add('show');
-}
-
-// Hide create modal
-function hideCreateModal() {
-    const modal = document.getElementById('create-modal');
-    modal.classList.remove('show');
-    document.getElementById('create-form').reset();
-}
-
-// Create new project
-document.getElementById('create-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const name = document.getElementById('project-name').value.trim();
-    const attendance_mode = document.getElementById('attendance-mode').value;
+    const name = nameInput.value.trim();
+    const mode = modeSelect.value;
     
     if (!name) {
-        showAlert('Project name required', 'error');
+        showAlert('Please enter a project name', 'warning');
         return;
     }
     
     try {
-        const response = await fetch(`${API_BASE_URL}/auth/projects/create`, {
+        const response = await fetch(`${API_BASE_URL}/auth/projects/create`, {  // FIXED: Correct path
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
             credentials: 'include',
-            body: JSON.stringify({ name, attendance_mode })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                name: name,
+                attendance_mode: mode 
+            })
         });
         
         const data = await response.json();
         
-        if (response.ok) {
-            showAlert('Project created successfully', 'success');
-            hideCreateModal();
-            await loadProjects();
-        } else {
-            showAlert(data.error || 'Failed to create project', 'error');
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to create project');
         }
+        
+        showAlert('Project created successfully!', 'success');
+        
+        // Reset form
+        nameInput.value = '';
+        modeSelect.value = 'face_recognition';
+        
+        // Reload projects
+        await loadProjects();
+        
     } catch (error) {
         console.error('Create project error:', error);
-        showAlert('Network error', 'error');
+        showAlert(`Failed to create project: ${error.message}`, 'error');
     }
-});
+}
 
 // Activate project
 async function activateProject(projectId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/auth/projects/${projectId}/activate`, {
+        const response = await fetch(`${API_BASE_URL}/auth/projects/${projectId}/activate`, {  // FIXED: Correct path
             method: 'POST',
             credentials: 'include'
         });
         
-        if (response.ok) {
-            showAlert('Project activated', 'success');
-            await loadProjects();
-        } else {
-            showAlert('Failed to activate project', 'error');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to activate project');
         }
+        
+        showAlert('Project activated!', 'success');
+        await loadProjects();
+        
     } catch (error) {
-        console.error('Activate error:', error);
-        showAlert('Network error', 'error');
+        console.error('Activate project error:', error);
+        showAlert(`Failed to activate project: ${error.message}`, 'error');
     }
 }
 
 // Delete project
-async function deleteProject(projectId) {
-    if (!confirm('Are you sure you want to delete this project? This cannot be undone.')) {
+async function deleteProject(projectId, projectName) {
+    if (!confirm(`Are you sure you want to delete "${projectName}"? This cannot be undone.`)) {
         return;
     }
     
     try {
-        const response = await fetch(`${API_BASE_URL}/auth/projects/${projectId}`, {
+        const response = await fetch(`${API_BASE_URL}/auth/projects/${projectId}`, {  // FIXED: Correct path
             method: 'DELETE',
             credentials: 'include'
         });
         
-        if (response.ok) {
-            showAlert('Project deleted', 'success');
-            await loadProjects();
-        } else {
-            showAlert('Failed to delete project', 'error');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to delete project');
         }
+        
+        showAlert('Project deleted successfully', 'success');
+        await loadProjects();
+        
     } catch (error) {
-        console.error('Delete error:', error);
-        showAlert('Network error', 'error');
+        console.error('Delete project error:', error);
+        showAlert(`Failed to delete project: ${error.message}`, 'error');
     }
 }
 
-// Close modal on outside click
-function handleModalClick(event) {
-    if (event.target.id === 'create-modal') {
-        hideCreateModal();
-    }
+// Helper functions
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
+
+function formatDate(dateString) {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+    });
+}
+
+function showAlert(message, type = 'info') {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    
+    // You can enhance this with a better UI alert
+    alert(message);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadProjects();
+    
+    // Attach form handler if form exists
+    const createForm = document.getElementById('create-project-form');
+    if (createForm) {
+        createForm.addEventListener('submit', createProject);
+    }
+});
