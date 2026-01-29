@@ -111,7 +111,9 @@ class MLClient {
                 try {
                     // FIXED: Ensure pathing is correct based on the base_url from backend
                     let baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
-                    const imageUrl = `${API_BASE_URL}${datasetInfo.base_url}/${encodeURIComponent(person.name)}/${imageName}`;                    console.log(`Fetching image from: ${imageUrl}`);
+                    
+                    const cleanBaseUrl = datasetInfo.base_url.replace('/api', '');
+                    const imageUrl = `${API_BASE_URL}${cleanBaseUrl}/${encodeURIComponent(person.name)}/${imageName}`;
                     const img = await this.loadImage(imageUrl);
                     const faces = await this.detectFacesInImage(img);
                     

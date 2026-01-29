@@ -118,13 +118,14 @@ async function startTraining() {
         // Inside startTraining function in train.js
         updateTrainingStatus('Saving model...', 90);
 
+        // Inside startTraining in train.js
         const saveResponse = await fetch(`${API_BASE_URL}/train/save`, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                // Ensure this exactly matches the backend's loop: for item in embeddings_data
-                embeddings: embeddings, // embeddings is already [{name: '...', embedding: [...]}]
+                // Ensure this is a list of {name, embedding} objects
+                embeddings: embeddings, 
                 metadata: {
                     model: 'mobilenet_tfjs',
                     total_images_processed: data.dataset.total_images,
