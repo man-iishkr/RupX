@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function checkDatasetStatus() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/train/status`, {
+        const response = await fetch(`${API_BASE_URL}/train/status`, {
             credentials: 'include'
         });
         
@@ -63,7 +63,7 @@ async function startTraining() {
         // Get dataset from backend
         updateTrainingStatus('Fetching dataset...', 30);
         
-        const response = await fetch(`${API_BASE_URL}/api/train/start`, {
+        const response = await fetch(`${API_BASE_URL}/train/start`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -89,7 +89,7 @@ async function startTraining() {
         // Send embeddings to backend
         updateTrainingStatus('Saving model...', 90);
         
-        const saveResponse = await fetch(`${API_BASE_URL}/api/train/save`, {
+        const saveResponse = await fetch(`${API_BASE_URL}/train/save`, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

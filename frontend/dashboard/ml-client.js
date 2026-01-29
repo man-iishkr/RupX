@@ -1,9 +1,4 @@
-/**
- * ml-client.js
- * TensorFlow.js wrapper for browser-based face recognition
- * Place this in: frontend/dashboard/ml-client.js
- */
-
+// ml-client.js - Client-side ML handling for face detection and recognition
 class MLClient {
     constructor() {
         this.faceDetector = null;
@@ -13,7 +8,7 @@ class MLClient {
 
     async initialize(progressCallback) {
         try {
-            console.log('🔄 Loading TensorFlow.js models...');
+            console.log('Loading TensorFlow.js models...');
             
             if (progressCallback) progressCallback({ progress: 20, message: 'Loading face detector...' });
             this.faceDetector = await blazeface.load();
@@ -24,11 +19,11 @@ class MLClient {
             if (progressCallback) progressCallback({ progress: 100, message: 'Ready!' });
             
             this.isReady = true;
-            console.log('✅ Models loaded successfully');
+            console.log('Models loaded successfully');
             return { success: true };
             
         } catch (error) {
-            console.error('❌ Model loading failed:', error);
+            console.error('Model loading failed:', error);
             return { success: false, error: error.message };
         }
     }
