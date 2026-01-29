@@ -115,15 +115,16 @@ async function startTraining() {
         });
         
         // Send embeddings to backend
+        // Inside startTraining function in train.js
         updateTrainingStatus('Saving model...', 90);
-        
-        // FIXED: Removed extra /api/ from path
+
         const saveResponse = await fetch(`${API_BASE_URL}/train/save`, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                embeddings: embeddings,
+                // Ensure this exactly matches the backend's loop: for item in embeddings_data
+                embeddings: embeddings, // embeddings is already [{name: '...', embedding: [...]}]
                 metadata: {
                     model: 'mobilenet_tfjs',
                     total_images_processed: data.dataset.total_images,
