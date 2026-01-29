@@ -4,7 +4,7 @@
 let socket = null;
 let webcamStream = null;
 let recognitionActive = false;
-let mlClient = null;
+// let mlClient = null;
 let markedToday = [];
 
 // Initialize when page loads

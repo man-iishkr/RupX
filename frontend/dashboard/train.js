@@ -1,7 +1,7 @@
 // train.js - Updated for client-side ML training
 // REPLACE YOUR CURRENT train.js WITH THIS FILE
 
-let mlClient = null;
+// let mlClient = null;
 let trainingInProgress = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
