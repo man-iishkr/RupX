@@ -1,4 +1,6 @@
 // ml-client.js - Client-side ML handling for face detection and recognition
+// FULL VERSION RETAINED
+
 class MLClient {
     constructor() {
         this.faceDetector = null;
@@ -32,7 +34,6 @@ class MLClient {
         const MODEL_URL = 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json';
         this.faceNetModel = await tf.loadLayersModel(MODEL_URL);
         
-        // Warm up model
         const dummy = tf.zeros([1, 224, 224, 3]);
         this.faceNetModel.predict(dummy).dispose();
         dummy.dispose();
@@ -40,9 +41,7 @@ class MLClient {
 
     async detectFaces(videoElement) {
         if (!this.isReady) throw new Error('Models not loaded');
-        
         const predictions = await this.faceDetector.estimateFaces(videoElement, false);
-        
         return predictions.map(pred => ({
             box: {
                 x: pred.topLeft[0],
@@ -73,7 +72,7 @@ class MLClient {
             
             const normalized = cropped.div(127.5).sub(1.0);
             const embedding = this.faceNetModel.predict(normalized);
-            const reshaped = embedding.reshape([224]);
+            const reshaped = embedding.reshape([embedding.shape[1]]);
             
             // Pad to 512 dimensions
             let embedding512;
@@ -110,6 +109,7 @@ class MLClient {
 
             for (const imageName of person.images) {
                 try {
+                    // FIXED: Ensure pathing is correct based on the base_url from backend
                     const imageUrl = `${API_BASE_URL}${datasetInfo.base_url}/${encodeURIComponent(person.name)}/${imageName}`;
                     const img = await this.loadImage(imageUrl);
                     const faces = await this.detectFacesInImage(img);
@@ -130,17 +130,12 @@ class MLClient {
                     embedding: avgEmbedding
                 });
             }
-
             processedPersons++;
         }
 
         if (progressCallback) {
-            progressCallback({
-                progress: 100,
-                message: `Training complete! Processed ${results.length} persons.`
-            });
+            progressCallback({ progress: 100, message: `Training complete!` });
         }
-
         return results;
     }
 
@@ -173,7 +168,7 @@ class MLClient {
             
             const normalized = cropped.div(127.5).sub(1.0);
             const embedding = this.faceNetModel.predict(normalized);
-            const reshaped = embedding.reshape([224]);
+            const reshaped = embedding.flatten();
             
             let embedding512;
             if (reshaped.shape[0] < 512) {
@@ -210,11 +205,8 @@ class MLClient {
     }
 
     cleanup() {
-        if (this.faceNetModel) {
-            this.faceNetModel.dispose();
-        }
+        if (this.faceNetModel) this.faceNetModel.dispose();
         this.isReady = false;
     }
 }
-
 window.MLClient = MLClient;
