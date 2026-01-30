@@ -63,16 +63,22 @@ class TursoCursor:
             # libsql_client uses .execute(query, positional_params)
             res = self._client.execute(query, params or [])
             
-            # Update cursor metadata
-            self.description = [[col] for col in res.columns]
-            self.rowcount = len(res.rows)
             
-            # CRITICAL FIX: Capture the last inserted row ID for the backend
+            self.description = [[col] for col in res.columns] if hasattr(res, 'columns') else None 
+            
+            
+            if hasattr(res, 'rows'):
+                self.rowcount = len(res.rows)
+                # Convert rows to dicts ONLY if rows exist (SELECT queries)
+                self._results = [self._to_dict(row, res.columns) for row in res.rows]
+            else:
+                self.rowcount = getattr(res, 'rows_affected', -1)
+                self._results = []
+            
+            # Preserved: Capture the last inserted row ID for the backend
             if hasattr(res, 'last_insert_rowid'):
                 self.lastrowid = res.last_insert_rowid
             
-            # Convert all rows to dicts immediately for fetchone/fetchall
-            self._results = [self._to_dict(row, res.columns) for row in res.rows]
             return res
         except Exception as e:
             print(f"Execute error: {e}")
