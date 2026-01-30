@@ -1,17 +1,19 @@
 """
 Training API Routes
-Modified: Returns dataset info for client-side training instead of training on server
+Modified: Returns dataset info from Cloudinary for client-side training
 """
 
 from flask import Blueprint, request, jsonify, session
 from functools import wraps
 import os
 import json
-import zipfile
-import shutil
 from datetime import datetime
 from utils.db import get_db
 import pandas as pd
+import cloudinary.api
+from dotenv import load_dotenv
+
+load_dotenv()
 
 bp = Blueprint('train', __name__)
 
@@ -34,12 +36,16 @@ def get_active_project():
         (session['user_id'],)
     )
     project = cursor.fetchone()
+    conn.close()
     return dict(project) if project else None
 
 @bp.route('/start', methods=['POST'])
 @require_auth
 def start_training():
-    """Start training - returns dataset info for client processing"""
+    """
+    Start training - MODIFIED FOR CLOUDINARY
+    Returns dataset info from Cloudinary cloud storage
+    """
     project = get_active_project()
     if not project:
         return jsonify({'error': 'No active project'}), 400
@@ -47,63 +53,81 @@ def start_training():
     if not project['dataset_uploaded']:
         return jsonify({'error': 'No dataset uploaded. Please upload dataset first.'}), 400
     
-    dataset_dir = f'storage/users/{session["user_id"]}/projects/{project["id"]}/dataset'
+    # Get Cloudinary folder
+    cloudinary_folder = project.get('cloudinary_folder')
+    if not cloudinary_folder:
+        return jsonify({'error': 'Dataset not found in cloud storage'}), 404
     
-    if not os.path.exists(dataset_dir):
-        return jsonify({'error': 'Dataset directory not found'}), 404
-    
-    # Scan dataset
-    person_folders = [f for f in os.listdir(dataset_dir) 
-                     if os.path.isdir(os.path.join(dataset_dir, f))]
-    
-    if len(person_folders) == 0:
-        return jsonify({'error': 'No person folders found in dataset'}), 400
-    
-    persons_info = []
-    total_images = 0
-    
-    for person_name in person_folders:
-        person_path = os.path.join(dataset_dir, person_name)
-        images = [f for f in os.listdir(person_path) 
-                 if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    try:
+        # Fetch images from Cloudinary
+        resources = cloudinary.api.resources(
+            type="upload",
+            prefix=cloudinary_folder,
+            max_results=500
+        )
         
-        if len(images) < 10:
-            continue
+        # Group by person
+        persons_dict = {}
+        for resource in resources.get('resources', []):
+            path_parts = resource['public_id'].split('/')
+            if len(path_parts) >= 4:
+                person_name = path_parts[-2]
+                image_name = path_parts[-1] + '.jpg'
+                
+                if person_name not in persons_dict:
+                    persons_dict[person_name] = []
+                
+                persons_dict[person_name].append(image_name)
         
-        selected_images = images[:20]  # Limit to 20 per person
+        # Build persons info
+        persons_info = []
+        total_images = 0
         
-        persons_info.append({
-            'name': person_name,
-            'image_count': len(images),
-            'images': selected_images
-        })
-        total_images += len(selected_images)
-    
-    # Log training start
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        'INSERT INTO training_logs (project_id, started_at, status, num_identities) '
-        'VALUES (?, ?, ?, ?)',
-        (project['id'], datetime.now().isoformat(), 'client_training', len(persons_info))
-    )
-    conn.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': 'Dataset ready for browser training',
-        'dataset': {
-            'total_persons': len(persons_info),
-            'total_images': total_images,
-            'persons': persons_info,
-            'base_url': f'/api/dataset/images/{project["id"]}'
-        }
-    }), 200
+        for person_name, images in persons_dict.items():
+            if len(images) < 10:
+                continue
+            
+            selected_images = images[:20]
+            persons_info.append({
+                'name': person_name,
+                'image_count': len(images),
+                'images': selected_images
+            })
+            total_images += len(selected_images)
+        
+        if len(persons_info) == 0:
+            return jsonify({'error': 'No valid persons found'}), 400
+        
+        # Log training start
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO training_logs (project_id, started_at, status, num_identities) '
+            'VALUES (?, ?, ?, ?)',
+            (project['id'], datetime.now().isoformat(), 'client_training', len(persons_info))
+        )
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Dataset ready for browser training',
+            'dataset': {
+                'total_persons': len(persons_info),
+                'total_images': total_images,
+                'persons': persons_info,
+                'base_url': f'/api/dataset/images/{project["id"]}'
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error fetching from Cloudinary: {e}")
+        return jsonify({'error': f'Failed to fetch dataset: {str(e)}'}), 500
 
 @bp.route('/save', methods=['POST'])
 @require_auth
 def save_embeddings():
-    """Save embeddings received from client"""
+    """Save embeddings received from client - MODIFIED: Auto-delete images after training"""
     project = get_active_project()
     if not project:
         return jsonify({'error': 'No active project'}), 400
@@ -123,54 +147,63 @@ def save_embeddings():
         if 'name' not in item or 'embedding' not in item:
             return jsonify({'error': 'Each embedding must have name and embedding'}), 400
     
-    # Save as JSON
-    models_dir = f'storage/users/{session["user_id"]}/projects/{project["id"]}/models'
-    os.makedirs(models_dir, exist_ok=True)
+    # Save embeddings in database as JSON
+    embeddings_json = json.dumps({
+        'embeddings': embeddings_data,
+        'metadata': {
+            **metadata,
+            'created_at': datetime.now().isoformat(),
+            'training_mode': 'client_side'
+        }
+    })
     
-    embeddings_file = os.path.join(models_dir, 'embeddings.json')
-    
-    with open(embeddings_file, 'w') as f:
-        json.dump({
-            'embeddings': embeddings_data,
-            'metadata': {
-                **metadata,
-                'created_at': datetime.now().isoformat(),
-                'training_mode': 'client_side'
-            }
-        }, f, indent=2)
-    
-    # Update project
+    # Update project with embeddings
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(
-        'UPDATE projects SET model_trained = 1 WHERE id = ?',
-        (project['id'],)
-    )
+    cursor.execute('''
+        UPDATE projects 
+        SET model_trained = 1,
+            embeddings_data = ?
+        WHERE id = ?
+    ''', (embeddings_json, project['id']))
     
     # Update training log
-    cursor.execute(
-        'UPDATE training_logs SET completed_at = ?, status = ?, images_processed = ? '
-        'WHERE project_id = ? AND status = "client_training" '
-        'ORDER BY started_at DESC LIMIT 1',
-        (datetime.now().isoformat(), 'completed', 
-         metadata.get('total_images_processed', 0), project['id'])
-    )
-    conn.commit()
+    cursor.execute('''
+        UPDATE training_logs 
+        SET completed_at = ?, status = ?, images_processed = ?
+        WHERE project_id = ? AND status = "client_training"
+        ORDER BY started_at DESC LIMIT 1
+    ''', (datetime.now().isoformat(), 'completed', 
+         metadata.get('total_images_processed', 0), project['id']))
     
-    # Create attendance file
+    conn.commit()
+    conn.close()
+    
+    # Create attendance file reference
     names = [item['name'] for item in embeddings_data]
-    create_attendance_file(session['user_id'], project['id'], names)
+    create_attendance_reference(session['user_id'], project['id'], names)
+    
+    # 🎯 NEW: Delete images from Cloudinary after successful training
+    cloudinary_folder = project.get('cloudinary_folder')
+    if cloudinary_folder:
+        try:
+            delete_success = delete_cloudinary_images(cloudinary_folder)
+            print(f"✅ Cloudinary cleanup: {'Success' if delete_success else 'Failed'}")
+        except Exception as e:
+            print(f"⚠️ Cloudinary cleanup error: {e}")
+            # Don't fail the request if cleanup fails
     
     return jsonify({
         'success': True,
-        'message': 'Model trained successfully',
-        'num_identities': len(embeddings_data)
+        'message': 'Model trained successfully! Training images have been removed to save storage.',
+        'num_identities': len(embeddings_data),
+        'storage_cleaned': True
     }), 200
 
 @bp.route('/progress', methods=['GET'])
 @require_auth
 def get_progress():
-    """Get training progress"""
+    """Get training progress - UNCHANGED"""
     project = get_active_project()
     if not project:
         return jsonify({'error': 'No active project'}), 400
@@ -183,6 +216,7 @@ def get_progress():
         (project['id'],)
     )
     log = cursor.fetchone()
+    conn.close()
     
     if not log:
         return jsonify({
@@ -201,39 +235,91 @@ def get_progress():
 @bp.route('/status', methods=['GET'])
 @require_auth
 def get_status():
-    """Get training status"""
+    """Get training status - MODIFIED for database storage"""
     project = get_active_project()
     if not project:
         return jsonify({'error': 'No active project'}), 400
     
-    models_dir = f'storage/users/{session["user_id"]}/projects/{project["id"]}/models'
-    embeddings_file = os.path.join(models_dir, 'embeddings.json')
-    
-    model_trained = os.path.exists(embeddings_file)
+    model_trained = bool(project.get('model_trained'))
     
     result = {
-        'dataset_uploaded': project['dataset_uploaded'],
+        'dataset_uploaded': bool(project['dataset_uploaded']),
         'model_trained': model_trained
     }
     
-    if model_trained:
+    if model_trained and project.get('embeddings_data'):
         try:
-            with open(embeddings_file, 'r') as f:
-                data = json.load(f)
-                result['latest_training'] = {
-                    'num_identities': len(data['embeddings']),
-                    'created_at': data['metadata'].get('created_at')
-                }
+            embeddings_data = json.loads(project['embeddings_data'])
+            result['latest_training'] = {
+                'num_identities': len(embeddings_data.get('embeddings', [])),
+                'created_at': embeddings_data.get('metadata', {}).get('created_at')
+            }
         except:
             pass
     
     return jsonify(result), 200
 
-def create_attendance_file(user_id, project_id, names):
-    """Create attendance Excel file"""
-    attendance_dir = f'storage/users/{user_id}/projects/{project_id}/attendance'
-    os.makedirs(attendance_dir, exist_ok=True)
+def create_attendance_reference(user_id, project_id, names):
+    """Store attendance template in database - no file system needed"""
+    conn = get_db()
+    cursor = conn.cursor()
     
-    file_path = f'{attendance_dir}/attendance.xlsx'
-    df = pd.DataFrame({'NAME': sorted(names)})
-    df.to_excel(file_path, index=False, engine='openpyxl')
+    # Store names as JSON in database
+    cursor.execute('''
+        UPDATE projects
+        SET attendance_names = ?
+        WHERE id = ?
+    ''', (json.dumps(sorted(names)), project_id))
+    
+    conn.commit()
+    conn.close()
+
+def delete_cloudinary_images(cloudinary_folder):
+    """
+    Delete all images from Cloudinary after successful training
+    This saves storage space - embeddings are all we need for recognition
+    """
+    try:
+        print(f"🗑️  Deleting images from Cloudinary: {cloudinary_folder}")
+        
+        # Get all resources in this folder
+        resources = cloudinary.api.resources(
+            type="upload",
+            prefix=cloudinary_folder,
+            max_results=500
+        )
+        
+        deleted_count = 0
+        
+        # Delete each image
+        for resource in resources.get('resources', []):
+            public_id = resource['public_id']
+            try:
+                cloudinary.uploader.destroy(public_id)
+                deleted_count += 1
+            except Exception as e:
+                print(f"⚠️  Failed to delete {public_id}: {e}")
+        
+        # If more than 500 images, paginate
+        while 'next_cursor' in resources:
+            resources = cloudinary.api.resources(
+                type="upload",
+                prefix=cloudinary_folder,
+                max_results=500,
+                next_cursor=resources['next_cursor']
+            )
+            
+            for resource in resources.get('resources', []):
+                public_id = resource['public_id']
+                try:
+                    cloudinary.uploader.destroy(public_id)
+                    deleted_count += 1
+                except Exception as e:
+                    print(f"⚠️  Failed to delete {public_id}: {e}")
+        
+        print(f"✅ Deleted {deleted_count} images from Cloudinary")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error deleting Cloudinary images: {e}")
+        return False

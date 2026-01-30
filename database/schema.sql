@@ -52,3 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(user_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_attendance_project ON attendance_records(project_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance_records(marked_at);
+
+ALTER TABLE projects ADD COLUMN cloudinary_folder TEXT;
+ALTER TABLE projects ADD COLUMN embeddings_data TEXT;
+ALTER TABLE projects ADD COLUMN attendance_names TEXT;
