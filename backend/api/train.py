@@ -59,41 +59,42 @@ def start_training():
         return jsonify({'error': 'Dataset not found in cloud storage'}), 404
     
     try:
-        # Fetch images from Cloudinary
+        # Fetch images from Cloudinary with secure URLs
         resources = cloudinary.api.resources(
             type="upload",
             prefix=cloudinary_folder,
             max_results=500
         )
         
-        # Group by person
+        # Group by person — store full Cloudinary URLs
         persons_dict = {}
         for resource in resources.get('resources', []):
             path_parts = resource['public_id'].split('/')
             if len(path_parts) >= 4:
                 person_name = path_parts[-2]
-                image_name = path_parts[-1] + '.jpg'
+                # Use the direct Cloudinary URL (publicly accessible, no auth needed)
+                image_url = resource.get('secure_url', resource.get('url', ''))
                 
                 if person_name not in persons_dict:
                     persons_dict[person_name] = []
                 
-                persons_dict[person_name].append(image_name)
+                persons_dict[person_name].append(image_url)
         
-        # Build persons info
+        # Build persons info with direct Cloudinary URLs
         persons_info = []
         total_images = 0
         
-        for person_name, images in persons_dict.items():
-            if len(images) < 10:
+        for person_name, image_urls in persons_dict.items():
+            if len(image_urls) < 10:
                 continue
             
-            selected_images = images[:20]
+            selected_urls = image_urls[:20]
             persons_info.append({
                 'name': person_name,
-                'image_count': len(images),
-                'images': selected_images
+                'image_count': len(image_urls),
+                'images': selected_urls
             })
-            total_images += len(selected_images)
+            total_images += len(selected_urls)
         
         if len(persons_info) == 0:
             return jsonify({'error': 'No valid persons found'}), 400
@@ -116,7 +117,7 @@ def start_training():
                 'total_persons': len(persons_info),
                 'total_images': total_images,
                 'persons': persons_info,
-                'base_url': f'/api/dataset/images/{project["id"]}'
+                'use_direct_urls': True
             }
         }), 200
         

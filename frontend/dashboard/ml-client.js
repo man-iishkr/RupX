@@ -107,12 +107,18 @@ class MLClient {
 
             const personEmbeddings = [];
 
-            for (const imageName of person.images) {
+            for (const imageEntry of person.images) {
                 try {
-                    // Build image URL: API_BASE_URL already has /api, base_url starts with /api
-                    // So strip /api from base_url to avoid duplication
-                    const cleanBaseUrl = datasetInfo.base_url.replace(/^\/api/, '');
-                    const imageUrl = `${API_BASE_URL}${cleanBaseUrl}/${encodeURIComponent(person.name)}/${imageName}`;
+                    // imageEntry is now a full Cloudinary URL (or legacy backend path)
+                    let imageUrl;
+                    if (imageEntry.startsWith('http')) {
+                        // Direct Cloudinary URL — use as-is
+                        imageUrl = imageEntry;
+                    } else {
+                        // Legacy: construct from base_url (fallback)
+                        const cleanBaseUrl = (datasetInfo.base_url || '').replace(/^\/api/, '');
+                        imageUrl = `${API_BASE_URL}${cleanBaseUrl}/${encodeURIComponent(person.name)}/${imageEntry}`;
+                    }
                     const img = await this.loadImage(imageUrl);
                     const faces = await this.detectFacesInImage(img);
 
@@ -121,7 +127,7 @@ class MLClient {
                         personEmbeddings.push(embedding);
                     }
                 } catch (error) {
-                    console.warn(`Failed to process ${imageName}:`, error);
+                    console.warn(`Failed to process ${imageEntry}:`, error);
                 }
             }
 
