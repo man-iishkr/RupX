@@ -307,11 +307,14 @@ def dataset_status():
             WHERE id = ?
         ''', (project['id'],))
         
-        result = cursor.fetchone()
+        row = cursor.fetchone()
         conn.close()
         
-        if not result:
+        if not row:
             return jsonify({'error': 'Project not found'}), 404
+        
+        # Convert to dict for .get() compatibility (sqlite3.Row doesn't support .get())
+        result = dict(row)
         
         stats = None
         if result['dataset_uploaded'] and result.get('cloudinary_folder'):

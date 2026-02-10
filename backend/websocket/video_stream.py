@@ -1,13 +1,12 @@
 """
 WebSocket Video Stream Handler
-Modified: Receives embeddings from client instead of images
+Modified: Receives embeddings from client, loads trained embeddings from DB
 """
 
 import json
 import numpy as np
-import os
 from datetime import datetime
-import pandas as pd
+from utils.db import get_db
 
 recognition_sessions = {}
 
@@ -28,7 +27,7 @@ def init_socketio(socketio_instance):
     
     @socketio_instance.on('start_recognition')
     def handle_start_recognition(data):
-        """Start recognition session"""
+        """Start recognition session - loads embeddings from DB"""
         user_id = data.get('user_id')
         project_id = data.get('project_id')
         
@@ -40,31 +39,48 @@ def init_socketio(socketio_instance):
         
         session_key = f"{user_id}_{project_id}"
         
-        # Load embeddings
-        embeddings_file = f'storage/users/{user_id}/projects/{project_id}/models/embeddings.json'
-        attendance_file = f'storage/users/{user_id}/projects/{project_id}/attendance/attendance.xlsx'
-        
-        if not os.path.exists(embeddings_file):
+        # Load embeddings from database instead of filesystem
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT embeddings_data, attendance_mode 
+                FROM projects 
+                WHERE id = ? AND user_id = ? AND model_trained = 1
+            ''', (project_id, user_id))
+            
+            row = cursor.fetchone()
+            conn.close()
+            
+            if not row:
+                socketio_instance.emit('recognition_error', {
+                    'error': 'Model not trained. Please train first.'
+                })
+                return
+            
+            project_data = dict(row)
+            embeddings_raw = project_data.get('embeddings_data')
+            
+            if not embeddings_raw:
+                socketio_instance.emit('recognition_error', {
+                    'error': 'No embeddings found. Please train the model first.'
+                })
+                return
+            
+            embeddings_data = json.loads(embeddings_raw)
+            
+        except Exception as e:
+            print(f"❌ Error loading embeddings from DB: {e}")
             socketio_instance.emit('recognition_error', {
-                'error': 'Model not trained. Please train first.'
+                'error': f'Failed to load embeddings: {str(e)}'
             })
             return
-        
-        if not os.path.exists(attendance_file):
-            socketio_instance.emit('recognition_error', {
-                'error': 'Attendance file not found'
-            })
-            return
-        
-        # Load embeddings from JSON
-        with open(embeddings_file, 'r') as f:
-            embeddings_data = json.load(f)
         
         recognition_sessions[session_key] = {
             'user_id': user_id,
             'project_id': project_id,
             'embeddings': embeddings_data['embeddings'],
-            'attendance_path': attendance_file,
+            'attendance_mode': project_data.get('attendance_mode', 'daily'),
             'marked_today': set(),
             'started_at': datetime.now().isoformat()
         }
@@ -137,8 +153,11 @@ def init_socketio(socketio_instance):
                 mark_key = f"{person_name}_{today}"
                 
                 if mark_key not in session_data['marked_today']:
-                    # Mark attendance
-                    success = mark_attendance(person_name, session_data['attendance_path'])
+                    # Mark attendance in database
+                    success = mark_attendance_db(
+                        person_name, 
+                        session_data['project_id']
+                    )
                     
                     if success:
                         session_data['marked_today'].add(mark_key)
@@ -192,37 +211,28 @@ def cosine_similarity(emb1, emb2):
     
     return dot_product / (norm_a * norm_b)
 
-def mark_attendance(person_name, attendance_path):
-    """Mark attendance in Excel"""
+def mark_attendance_db(person_name, project_id):
+    """Mark attendance in database using attendance_records table"""
     try:
-        df = pd.read_excel(attendance_path)
-        today = datetime.now().strftime('%Y-%m-%d')
-        time_now = datetime.now().strftime('%I:%M %p')
+        conn = get_db()
+        cursor = conn.cursor()
         
-        # Add date column if needed
-        if today not in df.columns:
-            df[today] = ''
+        cursor.execute('''
+            INSERT INTO attendance_records (project_id, name, marked_at, session_id)
+            VALUES (?, ?, ?, ?)
+        ''', (project_id, person_name, datetime.now().isoformat(), 
+              datetime.now().strftime('%Y-%m-%d')))
         
-        # Find person row
-        person_rows = df[df['NAME'] == person_name].index
+        conn.commit()
+        conn.close()
         
-        if len(person_rows) == 0:
-            print(f"⚠️  Person '{person_name}' not found")
-            return False
-        
-        person_row = person_rows[0]
-        df.at[person_row, today] = time_now
-        
-        # Save
-        df.to_excel(attendance_path, index=False, engine='openpyxl')
-        
-        print(f"✅ Marked: {person_name} at {time_now}")
+        print(f"✅ Marked: {person_name} at {datetime.now().strftime('%I:%M %p')}")
         return True
         
     except Exception as e:
         print(f"❌ Failed to mark attendance: {str(e)}")
         return False
-    
+
 def get_recognition_status(user_id, project_id):
     """Bridge for recognize.py to check if a session is active"""
     session_key = f"{user_id}_{project_id}"
@@ -234,10 +244,33 @@ def get_recognition_status(user_id, project_id):
         }
     return {'active': False}
 
-def start_recognition_session(user_id, project_id):
-    """Allows programmatic start if needed by recognize.py"""
-    # This can remain a placeholder or call handle_start_recognition logic
-    pass
+def start_recognition_session(user_id, project_id, embeddings_list, attendance_mode='daily'):
+    """Start recognition session programmatically from recognize.py
+    
+    Args:
+        user_id: User ID
+        project_id: Project ID
+        embeddings_list: List of {name, embedding} dicts from DB
+        attendance_mode: 'daily' or other mode
+    
+    Returns:
+        True if session started, False if already running
+    """
+    session_key = f"{user_id}_{project_id}"
+    
+    if session_key in recognition_sessions:
+        return False  # Already running
+    
+    recognition_sessions[session_key] = {
+        'user_id': user_id,
+        'project_id': project_id,
+        'embeddings': embeddings_list,
+        'attendance_mode': attendance_mode,
+        'marked_today': set(),
+        'started_at': datetime.now().isoformat()
+    }
+    
+    return True
 
 def stop_recognition_session(user_id, project_id):
     """Allows programmatic stop if needed by recognize.py"""

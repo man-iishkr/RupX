@@ -11,19 +11,19 @@ class MLClient {
     async initialize(progressCallback) {
         try {
             console.log('Loading TensorFlow.js models...');
-            
+
             if (progressCallback) progressCallback({ progress: 20, message: 'Loading face detector...' });
             this.faceDetector = await blazeface.load();
-            
+
             if (progressCallback) progressCallback({ progress: 60, message: 'Loading recognition model...' });
             await this.loadEmbeddingModel();
-            
+
             if (progressCallback) progressCallback({ progress: 100, message: 'Ready!' });
-            
+
             this.isReady = true;
             console.log('Models loaded successfully');
             return { success: true };
-            
+
         } catch (error) {
             console.error('Model loading failed:', error);
             return { success: false, error: error.message };
@@ -33,7 +33,7 @@ class MLClient {
     async loadEmbeddingModel() {
         const MODEL_URL = 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json';
         this.faceNetModel = await tf.loadLayersModel(MODEL_URL);
-        
+
         const dummy = tf.zeros([1, 224, 224, 3]);
         this.faceNetModel.predict(dummy).dispose();
         dummy.dispose();
@@ -69,11 +69,11 @@ class MLClient {
                 [0],
                 [224, 224]
             );
-            
+
             const normalized = cropped.div(127.5).sub(1.0);
             const embedding = this.faceNetModel.predict(normalized);
             const reshaped = embedding.reshape([embedding.shape[1]]);
-            
+
             // Pad to 512 dimensions
             let embedding512;
             if (reshaped.shape[0] < 512) {
@@ -82,7 +82,7 @@ class MLClient {
             } else {
                 embedding512 = reshaped.slice([0], [512]);
             }
-            
+
             const embArray = Array.from(embedding512.dataSync());
             const norm = Math.sqrt(embArray.reduce((sum, val) => sum + val * val, 0));
             return embArray.map(val => val / norm);
@@ -109,14 +109,13 @@ class MLClient {
 
             for (const imageName of person.images) {
                 try {
-                    // FIXED: Ensure pathing is correct based on the base_url from backend
-                    let baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
-                    
-                    const cleanBaseUrl = datasetInfo.base_url.replace('/api', '');
+                    // Build image URL: API_BASE_URL already has /api, base_url starts with /api
+                    // So strip /api from base_url to avoid duplication
+                    const cleanBaseUrl = datasetInfo.base_url.replace(/^\/api/, '');
                     const imageUrl = `${API_BASE_URL}${cleanBaseUrl}/${encodeURIComponent(person.name)}/${imageName}`;
                     const img = await this.loadImage(imageUrl);
                     const faces = await this.detectFacesInImage(img);
-                    
+
                     if (faces.length > 0) {
                         const embedding = await this.generateEmbeddingFromImage(img, faces[0].box);
                         personEmbeddings.push(embedding);
@@ -168,11 +167,11 @@ class MLClient {
                 [0],
                 [224, 224]
             );
-            
+
             const normalized = cropped.div(127.5).sub(1.0);
             const embedding = this.faceNetModel.predict(normalized);
             const reshaped = embedding.flatten();
-            
+
             let embedding512;
             if (reshaped.shape[0] < 512) {
                 const padding = tf.zeros([512 - reshaped.shape[0]]);
@@ -180,7 +179,7 @@ class MLClient {
             } else {
                 embedding512 = reshaped.slice([0], [512]);
             }
-            
+
             const embArray = Array.from(embedding512.dataSync());
             const norm = Math.sqrt(embArray.reduce((sum, val) => sum + val * val, 0));
             return embArray.map(val => val / norm);

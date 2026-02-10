@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function checkModelStatus() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/train/status`, {
+        const response = await fetch(`${API_BASE_URL}/train/status`, {
             credentials: 'include'
         });
         
