@@ -52,6 +52,38 @@ os.makedirs('storage/models', exist_ok=True)
 from utils.db import get_db, init_db, DB_TYPE
 
 # Initialize database on startup
+def ensure_schema_columns():
+    """Ensure all required columns exist in the projects table.
+    This runs every startup to apply any new ALTER TABLE migrations
+    that init_db() may have skipped (when tables already exist).
+    """
+    migrations = [
+        "ALTER TABLE projects ADD COLUMN cloudinary_folder TEXT",
+        "ALTER TABLE projects ADD COLUMN embeddings_data TEXT",
+        "ALTER TABLE projects ADD COLUMN attendance_names TEXT",
+    ]
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        for stmt in migrations:
+            try:
+                cursor.execute(stmt)
+            except Exception as e:
+                # Ignore "duplicate column" / "already exists" errors
+                err_msg = str(e).lower()
+                if 'duplicate' in err_msg or 'already exists' in err_msg:
+                    continue
+                print(f"⚠️  Migration warning: {e}")
+        
+        conn.commit()
+        conn.close()
+        print("✅ Schema columns verified")
+        
+    except Exception as e:
+        print(f"⚠️  Column migration failed: {e}")
+
 def initialize_database():
     """Initialize database if not already set up"""
     print("\n" + "=" * 60)
@@ -83,6 +115,9 @@ def initialize_database():
             print("✅ Database initialized")
         else:
             print("✅ Database ready")
+        
+        # Always run column migrations (safe even if columns already exist)
+        ensure_schema_columns()
             
     except Exception as e:
         print(f"⚠️  Database check failed: {e}")
