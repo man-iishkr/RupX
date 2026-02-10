@@ -169,13 +169,27 @@ def save_embeddings():
     ''', (embeddings_json, project['id']))
     
     # Update training log
-    cursor.execute('''
-        UPDATE training_logs 
-        SET completed_at = ?, status = ?, images_processed = ?
-        WHERE project_id = ? AND status = "client_training"
-        ORDER BY started_at DESC LIMIT 1
-    ''', (datetime.now().isoformat(), 'completed', 
-         metadata.get('total_images_processed', 0), project['id']))
+    # Update training log - find latest 'client_training' log first
+    try:
+        cursor.execute('''
+            SELECT id FROM training_logs 
+            WHERE project_id = ? AND status = 'client_training'
+            ORDER BY started_at DESC LIMIT 1
+        ''', (project['id'],))
+        
+        log_row = cursor.fetchone()
+        
+        if log_row:
+            log_id = dict(log_row)['id']
+            cursor.execute('''
+                UPDATE training_logs 
+                SET completed_at = ?, status = ?, images_processed = ?
+                WHERE id = ?
+            ''', (datetime.now().isoformat(), 'completed', 
+                 metadata.get('total_images_processed', 0), log_id))
+    except Exception as e:
+        print(f"Error updating training log: {e}")
+        # Don't fail the request if logging fails
     
     conn.commit()
     conn.close()

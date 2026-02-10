@@ -72,8 +72,9 @@ def ensure_schema_columns():
                 cursor.execute(stmt)
             except Exception as e:
                 # Ignore "duplicate column" / "already exists" errors
+                # libsql_client throws KeyError('result') for existing columns
                 err_msg = str(e).lower()
-                if 'duplicate' in err_msg or 'already exists' in err_msg:
+                if 'duplicate' in err_msg or 'already exists' in err_msg or err_msg == "'result'":
                     continue
                 print(f"⚠️  Migration warning: {e}")
         
