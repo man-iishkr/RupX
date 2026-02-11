@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test Recognition - RupX</title>
     <link rel="stylesheet" href="/dashboard/dashboard-styles.css">
-    
+
     <!-- TensorFlow.js - ADD THESE 3 LINES -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7"></script>
+    <!-- face-api.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="/dashboard/ml-client.js"></script>
 </head>
+
 <body>
     <div class="dashboard-container">
         <nav class="sidebar">
@@ -39,29 +41,30 @@
                 <button onclick="logout()" class="btn-logout">Logout</button>
             </div>
         </nav>
-        
+
         <main class="main-content">
             <header class="content-header">
                 <h1>Test Face Recognition</h1>
             </header>
-            
+
             <div id="not-trained-message" style="display: none;">
                 <div class="alert alert-warning">
                     <span>⚠</span>
                     <div>
                         <strong>Model Not Trained</strong>
                         <p>Please train your model before testing recognition.</p>
-                        <a href="/dashboard/train.html" class="btn-primary" style="margin-top: 1rem; display: inline-block;">Go to Training</a>
+                        <a href="/dashboard/train.html" class="btn-primary"
+                            style="margin-top: 1rem; display: inline-block;">Go to Training</a>
                     </div>
                 </div>
             </div>
-            
+
             <div id="recognition-container" style="display: none;">
                 <div class="video-container">
                     <video id="webcam" autoplay playsinline></video>
                     <canvas id="overlay" class="video-overlay"></canvas>
                 </div>
-                
+
                 <div class="video-controls">
                     <button id="start-btn" class="btn-success" onclick="startRecognition()">
                         ▶ Start Recognition
@@ -70,19 +73,21 @@
                         ⏸ Stop Recognition
                     </button>
                 </div>
-                
+
                 <div class="attendance-list">
                     <h3>✅ Marked Today</h3>
                     <div id="marked-list">
-                        <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No one marked yet</p>
+                        <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No one marked yet
+                        </p>
                     </div>
                 </div>
             </div>
         </main>
     </div>
-    
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
     <script src="/dashboard/dashboard.js"></script>
     <script src="/dashboard/test.js"></script>
 </body>
+
 </html>

@@ -120,13 +120,14 @@ def init_socketio(socketio_instance):
         try:
             detected_embedding = np.array(embedding, dtype=np.float32)
             
-            if detected_embedding.shape[0] != 512:
+            # Check for 128D (FaceNet/face-api) OR 512D (legacy/custom)
+            if detected_embedding.shape[0] not in [128, 512]:
                 socketio_instance.emit('recognition_error', {
-                    'error': f'Invalid embedding dimension: {detected_embedding.shape[0]}'
+                    'error': f'Invalid embedding dimension: {detected_embedding.shape[0]}. Expected 128 or 512.'
                 })
                 return
             
-            # Normalize
+            # Normalize (FaceNet embeddings should already be normalized, but good safety)
             detected_embedding = detected_embedding / np.linalg.norm(detected_embedding)
             
         except Exception as e:
@@ -145,7 +146,10 @@ def init_socketio(socketio_instance):
             # Calculate cosine similarity
             similarity = cosine_similarity(detected_embedding, stored_embedding)
             
-            if similarity > 0.6:  # Match threshold
+            # Threshold: 0.8 for 128D (FaceNet), 0.6 for 512D (Legacy)
+            threshold = 0.8 if detected_embedding.shape[0] == 128 else 0.6
+            
+            if similarity > threshold:  # Match threshold
                 person_name = stored_person['name']
                 
                 # Check if already marked today

@@ -1,27 +1,32 @@
-// ml-client.js - Client-side ML handling for face detection and recognition
-// FULL VERSION RETAINED
+// ml-client.js - Client-side ML handling using face-api.js
+// REWRITTEN for proper 128D face embeddings
 
 class MLClient {
     constructor() {
-        this.faceDetector = null;
-        this.faceNetModel = null;
         this.isReady = false;
+        // Point to the official models repo or a reliable mirror
+        this.MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        this.minConfidence = 0.5;
+        this.descriptorLength = 128;
     }
 
     async initialize(progressCallback) {
         try {
-            console.log('Loading TensorFlow.js models...');
+            console.log('Loading face-api.js models...');
 
-            if (progressCallback) progressCallback({ progress: 20, message: 'Loading face detector...' });
-            this.faceDetector = await blazeface.load();
+            if (progressCallback) progressCallback({ progress: 10, message: 'Loading Face Detector...' });
 
-            if (progressCallback) progressCallback({ progress: 60, message: 'Loading recognition model...' });
-            await this.loadEmbeddingModel();
+            // Load models in parallel for speed
+            await Promise.all([
+                faceapi.nets.ssdMobilenetv1.loadFromUri(this.MODEL_URL), // Higher accuracy detector
+                faceapi.nets.faceLandmark68Net.loadFromUri(this.MODEL_URL), // For face alignment
+                faceapi.nets.faceRecognitionNet.loadFromUri(this.MODEL_URL) // For 128D embeddings
+            ]);
 
             if (progressCallback) progressCallback({ progress: 100, message: 'Ready!' });
 
             this.isReady = true;
-            console.log('Models loaded successfully');
+            console.log('✅ face-api.js models loaded successfully');
             return { success: true };
 
         } catch (error) {
@@ -30,65 +35,88 @@ class MLClient {
         }
     }
 
-    async loadEmbeddingModel() {
-        const MODEL_URL = 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json';
-        this.faceNetModel = await tf.loadLayersModel(MODEL_URL);
-
-        const dummy = tf.zeros([1, 224, 224, 3]);
-        this.faceNetModel.predict(dummy).dispose();
-        dummy.dispose();
-    }
-
+    /**
+     * Detect faces in video stream
+     * @param {HTMLVideoElement} videoElement
+     */
     async detectFaces(videoElement) {
         if (!this.isReady) throw new Error('Models not loaded');
-        const predictions = await this.faceDetector.estimateFaces(videoElement, false);
-        return predictions.map(pred => ({
+
+        // Use SSD MobileNet V1 for detection
+        const detections = await faceapi.detectAllFaces(
+            videoElement,
+            new faceapi.SsdMobilenetv1Options({ minConfidence: this.minConfidence })
+        ).withFaceLandmarks().withFaceDescriptors();
+
+        return detections.map(det => ({
             box: {
-                x: pred.topLeft[0],
-                y: pred.topLeft[1],
-                width: pred.bottomRight[0] - pred.topLeft[0],
-                height: pred.bottomRight[1] - pred.topLeft[1]
+                x: det.detection.box.x,
+                y: det.detection.box.y,
+                width: det.detection.box.width,
+                height: det.detection.box.height
             },
-            confidence: pred.probability
+            confidence: det.detection.score,
+            // Include descriptor directly if needed, but for now we format to match old API
+            descriptor: det.descriptor
         }));
     }
 
+    /**
+     * Generate embedding for a specific face (used in real-time recognition)
+     * @param {HTMLVideoElement} videoElement 
+     * @param {Object} faceBox - Not strictly needed if we re-detect, but we can optimise
+     */
     async generateEmbedding(videoElement, faceBox) {
         if (!this.isReady) throw new Error('Models not loaded');
 
-        return tf.tidy(() => {
-            const video = tf.browser.fromPixels(videoElement);
-            const cropped = tf.image.cropAndResize(
-                video.expandDims(0),
-                [[
-                    faceBox.y / videoElement.videoHeight,
-                    faceBox.x / videoElement.videoWidth,
-                    (faceBox.y + faceBox.height) / videoElement.videoHeight,
-                    (faceBox.x + faceBox.width) / videoElement.videoWidth
-                ]],
-                [0],
-                [224, 224]
-            );
+        // Note: In face-api, we usually do detection + embedding in one go.
+        // If we are forced to separate, we can re-run detection on the region or full frame.
+        // For efficiency in this specific API structure, we'll assume we want the best face close to the box 
+        // OR we just detect all and find the matching one.
 
-            const normalized = cropped.div(127.5).sub(1.0);
-            const embedding = this.faceNetModel.predict(normalized);
-            const reshaped = embedding.reshape([embedding.shape[1]]);
+        // However, for best accuracy, we should run the full pipeline on the frame.
+        const detections = await faceapi.detectAllFaces(
+            videoElement,
+            new faceapi.SsdMobilenetv1Options({ minConfidence: this.minConfidence })
+        ).withFaceLandmarks().withFaceDescriptors();
 
-            // Pad to 512 dimensions
-            let embedding512;
-            if (reshaped.shape[0] < 512) {
-                const padding = tf.zeros([512 - reshaped.shape[0]]);
-                embedding512 = tf.concat([reshaped, padding]);
-            } else {
-                embedding512 = reshaped.slice([0], [512]);
+        // Find the face closest to the provided box
+        let bestMatch = null;
+        let maxIoU = 0;
+
+        for (const det of detections) {
+            const iou = this.getIoU(faceBox, det.detection.box);
+            if (iou > maxIoU) {
+                maxIoU = iou;
+                bestMatch = det;
             }
+        }
 
-            const embArray = Array.from(embedding512.dataSync());
-            const norm = Math.sqrt(embArray.reduce((sum, val) => sum + val * val, 0));
-            return embArray.map(val => val / norm);
-        });
+        if (bestMatch && maxIoU > 0.3) {
+            return Array.from(bestMatch.descriptor);
+        }
+
+        return null;
     }
 
+    getIoU(box1, box2) {
+        const x1 = Math.max(box1.x, box2.x);
+        const y1 = Math.max(box1.y, box2.y);
+        const x2 = Math.min(box1.x + box1.width, box2.x + box2.width);
+        const y2 = Math.min(box1.y + box1.height, box2.y + box2.height);
+
+        if (x1 >= x2 || y1 >= y2) return 0;
+
+        const intersection = (x2 - x1) * (y2 - y1);
+        const union = (box1.width * box1.height) + (box2.width * box2.height) - intersection;
+        return intersection / union;
+    }
+
+    /**
+     * Train from dataset
+     * @param {Object} datasetInfo 
+     * @param {Function} progressCallback 
+     */
     async trainFromDataset(datasetInfo, progressCallback) {
         if (!this.isReady) throw new Error('Models not loaded');
 
@@ -105,37 +133,35 @@ class MLClient {
                 });
             }
 
-            const personEmbeddings = [];
+            const personDescriptors = [];
 
             for (const imageEntry of person.images) {
                 try {
-                    // imageEntry is now a full Cloudinary URL (or legacy backend path)
-                    let imageUrl;
-                    if (imageEntry.startsWith('http')) {
-                        // Direct Cloudinary URL — use as-is
-                        imageUrl = imageEntry;
-                    } else {
-                        // Legacy: construct from base_url (fallback)
-                        const cleanBaseUrl = (datasetInfo.base_url || '').replace(/^\/api/, '');
-                        imageUrl = `${API_BASE_URL}${cleanBaseUrl}/${encodeURIComponent(person.name)}/${imageEntry}`;
-                    }
-                    const img = await this.loadImage(imageUrl);
-                    const faces = await this.detectFacesInImage(img);
+                    let imageUrl = imageEntry.startsWith('http') ? imageEntry :
+                        `${API_BASE_URL}${(datasetInfo.base_url || '').replace(/^\/api/, '')}/${encodeURIComponent(person.name)}/${imageEntry}`;
 
-                    if (faces.length > 0) {
-                        const embedding = await this.generateEmbeddingFromImage(img, faces[0].box);
-                        personEmbeddings.push(embedding);
+                    const img = await this.loadImage(imageUrl);
+
+                    // Detect face and get descriptor (embedding)
+                    const detection = await faceapi.detectSingleFace(
+                        img,
+                        new faceapi.SsdMobilenetv1Options({ minConfidence: this.minConfidence })
+                    ).withFaceLandmarks().withFaceDescriptor();
+
+                    if (detection) {
+                        personDescriptors.push(detection.descriptor);
                     }
                 } catch (error) {
                     console.warn(`Failed to process ${imageEntry}:`, error);
                 }
             }
 
-            if (personEmbeddings.length > 0) {
-                const avgEmbedding = this.averageEmbeddings(personEmbeddings);
+            if (personDescriptors.length > 0) {
+                // Average the 128D vectors
+                const avgDescriptor = this.averageVectors(personDescriptors);
                 results.push({
                     name: person.name,
-                    embedding: avgEmbedding
+                    embedding: avgDescriptor
                 });
             }
             processedPersons++;
@@ -145,51 +171,6 @@ class MLClient {
             progressCallback({ progress: 100, message: `Training complete!` });
         }
         return results;
-    }
-
-    async detectFacesInImage(img) {
-        const predictions = await this.faceDetector.estimateFaces(img, false);
-        return predictions.map(pred => ({
-            box: {
-                x: pred.topLeft[0],
-                y: pred.topLeft[1],
-                width: pred.bottomRight[0] - pred.topLeft[0],
-                height: pred.bottomRight[1] - pred.topLeft[1]
-            }
-        }));
-    }
-
-    async generateEmbeddingFromImage(img, faceBox) {
-        return tf.tidy(() => {
-            const imgTensor = tf.browser.fromPixels(img);
-            const cropped = tf.image.cropAndResize(
-                imgTensor.expandDims(0),
-                [[
-                    faceBox.y / img.height,
-                    faceBox.x / img.width,
-                    (faceBox.y + faceBox.height) / img.height,
-                    (faceBox.x + faceBox.width) / img.width
-                ]],
-                [0],
-                [224, 224]
-            );
-
-            const normalized = cropped.div(127.5).sub(1.0);
-            const embedding = this.faceNetModel.predict(normalized);
-            const reshaped = embedding.flatten();
-
-            let embedding512;
-            if (reshaped.shape[0] < 512) {
-                const padding = tf.zeros([512 - reshaped.shape[0]]);
-                embedding512 = tf.concat([reshaped, padding]);
-            } else {
-                embedding512 = reshaped.slice([0], [512]);
-            }
-
-            const embArray = Array.from(embedding512.dataSync());
-            const norm = Math.sqrt(embArray.reduce((sum, val) => sum + val * val, 0));
-            return embArray.map(val => val / norm);
-        });
     }
 
     loadImage(url) {
@@ -202,19 +183,28 @@ class MLClient {
         });
     }
 
-    averageEmbeddings(embeddings) {
-        const sum = new Array(512).fill(0);
-        embeddings.forEach(emb => {
-            emb.forEach((val, i) => sum[i] += val);
-        });
-        const avg = sum.map(val => val / embeddings.length);
-        const norm = Math.sqrt(avg.reduce((s, v) => s + v * v, 0));
-        return avg.map(v => v / norm);
+    averageVectors(vectors) {
+        const numVectors = vectors.length;
+        const dims = vectors[0].length;
+        const sum = new Float32Array(dims);
+
+        for (const vec of vectors) {
+            for (let i = 0; i < dims; i++) {
+                sum[i] += vec[i];
+            }
+        }
+
+        for (let i = 0; i < dims; i++) {
+            sum[i] /= numVectors;
+        }
+
+        return Array.from(sum);
     }
 
     cleanup() {
-        if (this.faceNetModel) this.faceNetModel.dispose();
         this.isReady = false;
+        // face-api doesn't have a strict dispose like TFJS layers model
     }
 }
+
 window.MLClient = MLClient;
