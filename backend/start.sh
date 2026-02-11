@@ -7,9 +7,9 @@ export PYTHONUNBUFFERED=1
 
 # Start gunicorn with optimized settings
 exec gunicorn app:app \
-  --worker-class gthread \
+  --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker \
   --workers 1 \
-  --threads 2 \
+  --threads 1 \
   --worker-connections 100 \
   --max-requests 500 \
   --max-requests-jitter 50 \
