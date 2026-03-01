@@ -4,8 +4,8 @@
 class MLClient {
     constructor() {
         this.isReady = false;
-        // Point to the official models repo or a reliable mirror
-        this.MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        // Use a reliable CDN for the raw model weights
+        this.MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
         this.minConfidence = 0.5;
         this.descriptorLength = 128;
     }
@@ -16,12 +16,18 @@ class MLClient {
 
             if (progressCallback) progressCallback({ progress: 10, message: 'Loading Face Detector...' });
 
-            // Load models in parallel for speed
-            await Promise.all([
-                faceapi.nets.ssdMobilenetv1.loadFromUri(this.MODEL_URL), // Higher accuracy detector
-                faceapi.nets.faceLandmark68Net.loadFromUri(this.MODEL_URL), // For face alignment
-                faceapi.nets.faceRecognitionNet.loadFromUri(this.MODEL_URL) // For 128D embeddings
+            // Add a timeout to model loading
+            const loadPromise = Promise.all([
+                faceapi.nets.ssdMobilenetv1.loadFromUri(this.MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(this.MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(this.MODEL_URL)
             ]);
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Model loading timed out after 30 seconds")), 30000)
+            );
+
+            await Promise.race([loadPromise, timeoutPromise]);
 
             if (progressCallback) progressCallback({ progress: 100, message: 'Ready!' });
 
@@ -31,6 +37,7 @@ class MLClient {
 
         } catch (error) {
             console.error('Model loading failed:', error);
+            if (progressCallback) progressCallback({ progress: 0, message: `Error: ${error.message}` });
             return { success: false, error: error.message };
         }
     }
