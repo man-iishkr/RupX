@@ -7,10 +7,8 @@ export PYTHONUNBUFFERED=1
 
 # Start gunicorn with optimized settings
 exec gunicorn app:app \
-  --worker-class gthread \
+  --worker-class eventlet \
   --workers 1 \
-  --threads 10 \
-  --worker-connections 100 \
   --max-requests 500 \
   --max-requests-jitter 50 \
   --timeout 120 \

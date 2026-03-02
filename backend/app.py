@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch(os=False, thread=False) # Important: don't patch thread
+
 from flask import Flask, request, jsonify, session, send_file
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
@@ -37,7 +40,7 @@ socketio = SocketIO(
         'https://rupx-backend.onrender.com',
         'https://rupx.netlify.app'
     ], 
-    async_mode='threading',
+    async_mode='eventlet',
     ping_timeout=120,          # Increased timeout
     ping_interval=25,
     max_http_buffer_size=10 * 1024 * 1024  # 10MB buffer

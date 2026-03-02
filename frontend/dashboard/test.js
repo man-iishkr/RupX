@@ -106,7 +106,7 @@ async function connectWebSocket() {
     return new Promise((resolve, reject) => {
         socket = io(API_BASE_URL, {
             withCredentials: true,
-            transports: ['polling', 'websocket']
+            transports: ['websocket']
         });
 
         socket.on('connect', () => {
