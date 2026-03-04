@@ -137,70 +137,68 @@ async function processFrames() {
         const canvas = document.getElementById('overlay');
         const ctx = canvas.getContext('2d');
 
-        // Set canvas size to match video
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // Clear previous drawings
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Detect faces using TensorFlow.js
-        const faces = await mlClient.detectFaces(video);
+        // Single pass: detect all faces + get descriptors
+        const detections = await faceapi
+            .detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: mlClient.minConfidence }))
+            .withFaceLandmarks()
+            .withFaceDescriptors();
 
-        // Draw bounding boxes
-        ctx.strokeStyle = '#00ff00';
         ctx.lineWidth = 3;
-        ctx.font = '16px Arial';
-        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 15px Arial';
 
-        for (const face of faces) {
-            // Draw rectangle
-            ctx.strokeRect(face.box.x, face.box.y, face.box.width, face.box.height);
+        for (const det of detections) {
+            const box = det.detection.box;
+            const embedding = Array.from(det.descriptor);
 
-            // Draw confidence
-            ctx.fillText(
-                `${Math.round(face.confidence * 100)}%`,
-                face.box.x,
-                face.box.y - 5
-            );
+            let label = '...';
+            let color = '#ffcc00';
 
-            // Generate embedding and send to backend
-            const embedding = await mlClient.generateEmbedding(video, face.box);
-
-            if (embedding) {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/recognize/frame`, {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            embedding: embedding,
-                            user_id: window.currentUser?.id,
-                            project_id: window.activeProject?.id,
-                            timestamp: new Date().toISOString()
-                        })
-                    });
-
-                    const data = await response.json();
-                    if (data.success && data.persons) {
-                        data.persons.forEach(person => {
-                            if (person.newly_marked) {
-                                addToMarkedList(person.name, person.confidence);
-                            }
-                        });
+            try {
+                const response = await fetch(`${API_BASE_URL}/recognize/frame`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ embedding })
+                });
+                const data = await response.json();
+                if (data.success && data.persons && data.persons.length > 0) {
+                    const person = data.persons[0];
+                    if (person.name !== 'Unknown') {
+                        label = `${person.name} ${Math.round(person.confidence * 100)}%`;
+                        color = '#00ff88';
+                        if (person.newly_marked) {
+                            addToMarkedList(person.name, person.confidence);
+                        }
+                    } else {
+                        label = 'Unknown';
+                        color = '#ff4444';
                     }
-                } catch (apiErr) {
-                    console.error('Frame processing API error:', apiErr);
                 }
+            } catch (apiErr) {
+                console.error('Frame API error:', apiErr);
             }
+
+            // Draw colored box
+            ctx.strokeStyle = color;
+            ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+            // Label background
+            const tw = ctx.measureText(label).width;
+            ctx.fillStyle = 'rgba(0,0,0,0.65)';
+            ctx.fillRect(box.x, box.y - 26, tw + 12, 22);
+            ctx.fillStyle = color;
+            ctx.fillText(label, box.x + 6, box.y - 9);
         }
 
     } catch (error) {
         console.error('Frame processing error:', error);
     }
 
-    // Continue processing frames (4 FPS for polling stability)
-    setTimeout(processFrames, 250);
+    setTimeout(processFrames, 250); // ~4 FPS
 }
 
 function stopRecognition() {

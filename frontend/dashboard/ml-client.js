@@ -6,7 +6,7 @@ class MLClient {
         this.isReady = false;
         // Use a reliable CDN for the raw model weights
         this.MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
-        this.minConfidence = 0.5;
+        this.minConfidence = 0.65; // Higher = fewer false detections
         this.descriptorLength = 128;
     }
 
@@ -69,41 +69,25 @@ class MLClient {
     }
 
     /**
-     * Generate embedding for a specific face (used in real-time recognition)
-     * @param {HTMLVideoElement} videoElement 
-     * @param {Object} faceBox - Not strictly needed if we re-detect, but we can optimise
+     * Generate embedding for the most prominent face in a video frame.
+     * Detects all faces and picks the highest-confidence one.
      */
-    async generateEmbedding(videoElement, faceBox) {
+    async generateEmbedding(videoElement) {
         if (!this.isReady) throw new Error('Models not loaded');
 
-        // Note: In face-api, we usually do detection + embedding in one go.
-        // If we are forced to separate, we can re-run detection on the region or full frame.
-        // For efficiency in this specific API structure, we'll assume we want the best face close to the box 
-        // OR we just detect all and find the matching one.
-
-        // However, for best accuracy, we should run the full pipeline on the frame.
         const detections = await faceapi.detectAllFaces(
             videoElement,
             new faceapi.SsdMobilenetv1Options({ minConfidence: this.minConfidence })
         ).withFaceLandmarks().withFaceDescriptors();
 
-        // Find the face closest to the provided box
-        let bestMatch = null;
-        let maxIoU = 0;
+        if (detections.length === 0) return null;
 
-        for (const det of detections) {
-            const iou = this.getIoU(faceBox, det.detection.box);
-            if (iou > maxIoU) {
-                maxIoU = iou;
-                bestMatch = det;
-            }
-        }
+        // Pick the highest-confidence face (most clearly detected)
+        const best = detections.reduce((prev, curr) =>
+            curr.detection.score > prev.detection.score ? curr : prev
+        );
 
-        if (bestMatch && maxIoU > 0.3) {
-            return Array.from(bestMatch.descriptor);
-        }
-
-        return null;
+        return Array.from(best.descriptor);
     }
 
     getIoU(box1, box2) {

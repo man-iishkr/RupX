@@ -27,14 +27,38 @@ def get_active_project():
     
     return dict(project) if project else None
 
-def cosine_similarity(emb1, emb2):
-    """Calculate cosine similarity"""
-    dot_product = np.dot(emb1, emb2)
-    norm_a = np.linalg.norm(emb1)
-    norm_b = np.linalg.norm(emb2)
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return float(dot_product / (norm_a * norm_b))
+def euclidean_distance(emb1, emb2):
+    """
+    Euclidean distance between two face embeddings.
+    face-api.js (FaceRecognitionNet) is trained to produce 128D embeddings
+    where Euclidean distance is the natural metric (like the dlib reference).
+    Lower distance = more similar faces.
+    """
+    return float(np.linalg.norm(emb1 - emb2))
+
+def find_best_match(detected_embedding, stored_embeddings, threshold=0.55):
+    """
+    Find the single best matching person from stored embeddings.
+    Returns (person_name, distance) or (None, distance) if no match.
+    
+    Threshold: 0.55 is derived from FaceNet paper 
+    (dlib uses 0.6, we use 0.55 for tighter matches).
+    Below threshold = same person; above = unknown/different person.
+    """
+    best_name = None
+    best_distance = float('inf')
+    
+    for stored_person in stored_embeddings:
+        stored_emb = np.array(stored_person['embedding'], dtype=np.float32)
+        distance = euclidean_distance(detected_embedding, stored_emb)
+        if distance < best_distance:
+            best_distance = distance
+            best_name = stored_person['name']
+    
+    if best_distance > threshold:
+        return None, best_distance  # Unknown face - reject
+    
+    return best_name, best_distance
 
 def mark_attendance_db(person_name, project_id):
     """Mark attendance in database using attendance_records table"""
@@ -181,37 +205,50 @@ def recognize_frame():
         detected_embedding = np.array(embedding, dtype=np.float32)
         if detected_embedding.shape[0] not in [128, 512]:
             return jsonify({'error': f'Invalid dimension: {detected_embedding.shape[0]}'}), 400
-            
-        detected_embedding = detected_embedding / np.linalg.norm(detected_embedding)
+        # No need to normalize - Euclidean distance works on raw embeddings
     except Exception as e:
         return jsonify({'error': f'Failed to parse embedding: {str(e)}'}), 400
-        
+
+    # Use Euclidean best-match with unknown rejection
+    # Threshold is tighter for 128D FaceNet embeddings
+    threshold = 0.55 if len(embedding) == 128 else 0.9
+    person_name, distance = find_best_match(
+        detected_embedding,
+        session_data['embeddings'],
+        threshold=threshold
+    )
+    
     recognized_persons = []
     
-    for stored_person in session_data['embeddings']:
-        stored_embedding = np.array(stored_person['embedding'], dtype=np.float32)
-        stored_embedding = stored_embedding / np.linalg.norm(stored_embedding)
+    if person_name is not None:
+        today = datetime.now().strftime('%Y-%m-%d')
+        mark_key = f"{person_name}_{today}"
         
-        similarity = cosine_similarity(detected_embedding, stored_embedding)
-        threshold = 0.8 if detected_embedding.shape[0] == 128 else 0.6
+        newly_marked = False
+        if mark_key not in session_data['marked_today']:
+            success = mark_attendance_db(person_name, project_id)
+            if success:
+                session_data['marked_today'].add(mark_key)
+                newly_marked = True
         
-        if similarity > threshold:
-            person_name = stored_person['name']
-            today = datetime.now().strftime('%Y-%m-%d')
-            mark_key = f"{person_name}_{today}"
-            
-            newly_marked = False
-            if mark_key not in session_data['marked_today']:
-                success = mark_attendance_db(person_name, project_id)
-                if success:
-                    session_data['marked_today'].add(mark_key)
-                    newly_marked = True
-                    
-            recognized_persons.append({
-                'name': person_name,
-                'confidence': float(similarity),
-                'timestamp': datetime.now().isoformat(),
-                'newly_marked': newly_marked
-            })
-            
+        # Convert Euclidean distance to confidence score (0-1, higher = more confident)
+        confidence = max(0.0, 1.0 - (distance / threshold))
+        
+        recognized_persons.append({
+            'name': person_name,
+            'confidence': round(confidence, 3),
+            'distance': round(distance, 4),
+            'timestamp': datetime.now().isoformat(),
+            'newly_marked': newly_marked
+        })
+    else:
+        # Unknown face detected — report it but don't mark attendance
+        recognized_persons.append({
+            'name': 'Unknown',
+            'confidence': 0.0,
+            'distance': round(distance, 4),
+            'timestamp': datetime.now().isoformat(),
+            'newly_marked': False
+        })
+        
     return jsonify({'success': True, 'persons': recognized_persons}), 200
