@@ -130,6 +130,7 @@ class MLClient {
         const results = [];
         const totalPersons = datasetInfo.persons.length;
         let processedPersons = 0;
+        let totalFacesDetected = 0;
 
         for (const person of datasetInfo.persons) {
             if (progressCallback) {
@@ -141,6 +142,7 @@ class MLClient {
             }
 
             const personDescriptors = [];
+            let imagesProcessed = 0;
 
             for (const imageEntry of person.images) {
                 try {
@@ -148,6 +150,7 @@ class MLClient {
                         `${API_BASE_URL}${(datasetInfo.base_url || '').replace(/^\/api/, '')}/${encodeURIComponent(person.name)}/${imageEntry}`;
 
                     const img = await this.loadImage(imageUrl);
+                    imagesProcessed++;
 
                     // Detect face and get descriptor (embedding)
                     const detection = await faceapi.detectSingleFace(
@@ -157,9 +160,10 @@ class MLClient {
 
                     if (detection) {
                         personDescriptors.push(detection.descriptor);
+                        totalFacesDetected++;
                     }
                 } catch (error) {
-                    console.warn(`Failed to process ${imageEntry}:`, error);
+                    console.warn(`Failed to process image for ${person.name}:`, error);
                 }
             }
 
@@ -170,12 +174,25 @@ class MLClient {
                     name: person.name,
                     embedding: avgDescriptor
                 });
+                console.log(`✅ ${person.name}: detected ${personDescriptors.length}/${imagesProcessed} faces`);
+            } else {
+                console.warn(`⚠️ ${person.name}: No faces detected in any of ${imagesProcessed} images! This person will not be recognized.`);
             }
             processedPersons++;
         }
 
+        if (results.length === 0) {
+            throw new Error(
+                `No faces detected in any images! Please ensure:\n` +
+                `1. Images clearly show a single face\n` +
+                `2. Images are not blurry or too dark\n` +
+                `3. Face is not obscured by glasses/masks\n` +
+                `Total images scanned: ${datasetInfo.persons.reduce((a, p) => a + p.images.length, 0)}`
+            );
+        }
+
         if (progressCallback) {
-            progressCallback({ progress: 100, message: `Training complete!` });
+            progressCallback({ progress: 100, message: `Training complete! ${results.length} persons with ${totalFacesDetected} face detections.` });
         }
         return results;
     }

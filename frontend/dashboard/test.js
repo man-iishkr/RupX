@@ -82,8 +82,8 @@ async function startRecognition() {
             video.onloadedmetadata = resolve;
         });
 
-        // Connect to WebSocket
-        await connectWebSocket();
+        // Connect to API session
+        await connectSession();
 
         // Start recognition loop
         recognitionActive = true;
@@ -102,48 +102,31 @@ async function startRecognition() {
     }
 }
 
-async function connectWebSocket() {
-    return new Promise((resolve, reject) => {
-        socket = io(API_BASE_URL, {
-            withCredentials: true,
-            transports: ['websocket']
-        });
-
-        socket.on('connect', () => {
-            console.log('✅ WebSocket connected');
-
-            // Start recognition session on backend
-            socket.emit('start_recognition', {
+async function connectSession() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/recognize/start`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
                 user_id: window.currentUser?.id,
                 project_id: window.activeProject?.id
-            });
+            })
         });
 
-        socket.on('recognition_started', (data) => {
-            console.log('🎯 Recognition session started:', data);
-            resolve();
-        });
+        const data = await response.json();
 
-        socket.on('face_recognized', (data) => {
-            console.log('✅ Face recognized:', data);
-            data.persons.forEach(person => {
-                if (person.newly_marked) {
-                    addToMarkedList(person.name, person.confidence);
-                }
-            });
-        });
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to start session');
+        }
 
-        socket.on('recognition_error', (data) => {
-            console.error('❌ Recognition error:', data);
-            showAlert(`Recognition error: ${data.error}`, 'error');
-            reject(new Error(data.error));
-        });
-
-        socket.on('connect_error', (error) => {
-            console.error('WebSocket connection error:', error);
-            reject(error);
-        });
-    });
+        console.log('✅ Recognition session started:', data);
+        return true;
+    } catch (error) {
+        console.error('❌ Recognition error:', error);
+        showAlert(`Recognition error: ${error.message}`, 'error');
+        throw error;
+    }
 }
 
 async function processFrames() {
@@ -184,12 +167,32 @@ async function processFrames() {
             // Generate embedding and send to backend
             const embedding = await mlClient.generateEmbedding(video, face.box);
 
-            socket.emit('recognize_embedding', {
-                embedding: embedding,
-                user_id: window.currentUser?.id,
-                project_id: window.activeProject?.id,
-                timestamp: new Date().toISOString()
-            });
+            if (embedding) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/recognize/frame`, {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            embedding: embedding,
+                            user_id: window.currentUser?.id,
+                            project_id: window.activeProject?.id,
+                            timestamp: new Date().toISOString()
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.success && data.persons) {
+                        data.persons.forEach(person => {
+                            if (person.newly_marked) {
+                                addToMarkedList(person.name, person.confidence);
+                            }
+                        });
+                    }
+                } catch (apiErr) {
+                    console.error('Frame processing API error:', apiErr);
+                }
+            }
         }
 
     } catch (error) {
@@ -210,15 +213,16 @@ function stopRecognition() {
         video.srcObject = null;
     }
 
-    // Disconnect WebSocket
-    if (socket) {
-        socket.emit('stop_recognition', {
+    // Disconnect API session
+    fetch(`${API_BASE_URL}/recognize/stop`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
             user_id: window.currentUser?.id,
             project_id: window.activeProject?.id
-        });
-        socket.disconnect();
-        socket = null;
-    }
+        })
+    }).catch(console.error);
 
     // Clear canvas
     const canvas = document.getElementById('overlay');

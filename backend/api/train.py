@@ -53,6 +53,28 @@ def start_training():
     if not project['dataset_uploaded']:
         return jsonify({'error': 'No dataset uploaded. Please upload dataset first.'}), 400
     
+    # If already trained, images would have been deleted. Warn the user.
+    if project.get('model_trained') and project.get('embeddings_data'):
+        # Check if images still exist in Cloudinary
+        cloudinary_folder = project.get('cloudinary_folder')
+        has_images = False
+        if cloudinary_folder:
+            try:
+                resources = cloudinary.api.resources(
+                    type="upload",
+                    prefix=cloudinary_folder,
+                    max_results=1
+                )
+                has_images = len(resources.get('resources', [])) > 0
+            except:
+                pass
+        
+        if not has_images:
+            return jsonify({
+                'error': 'Model is already trained and training images have been removed (to save space). '
+                         'To retrain, please upload a new dataset first.'
+            }), 400
+    
     # Get Cloudinary folder
     cloudinary_folder = project.get('cloudinary_folder')
     if not cloudinary_folder:
@@ -142,11 +164,14 @@ def save_embeddings():
     metadata = data.get('metadata', {})
     
     if not isinstance(embeddings_data, list) or len(embeddings_data) == 0:
-        return jsonify({'error': 'Invalid embeddings format'}), 400
+        return jsonify({'error': 'No embeddings generated. Face-api could not detect faces in your images. Please use clearer face images.'}), 400
     
+    # Validate each embedding has correct structure and dimension
     for item in embeddings_data:
         if 'name' not in item or 'embedding' not in item:
             return jsonify({'error': 'Each embedding must have name and embedding'}), 400
+        if not isinstance(item['embedding'], list) or len(item['embedding']) not in [128, 512]:
+            return jsonify({'error': f'Invalid embedding dimension for {item["name"]}. Got {len(item["embedding"])}D, expected 128D.'}), 400
     
     # Save embeddings in database as JSON
     embeddings_json = json.dumps({
@@ -262,6 +287,18 @@ def get_status():
         'model_trained': model_trained
     }
     
+    total_images = 0
+    if not model_trained and project.get('cloudinary_folder'):
+        try:
+            resources = cloudinary.api.resources(
+                type="upload",
+                prefix=project['cloudinary_folder'],
+                max_results=500
+            )
+            total_images = len(resources.get('resources', []))
+        except:
+            pass
+    
     if model_trained and project.get('embeddings_data'):
         try:
             embeddings_data = json.loads(project['embeddings_data'])
@@ -269,8 +306,12 @@ def get_status():
                 'num_identities': len(embeddings_data.get('embeddings', [])),
                 'created_at': embeddings_data.get('metadata', {}).get('created_at')
             }
+            if 'metadata' in embeddings_data:
+                total_images = embeddings_data.get('metadata', {}).get('total_images_processed', 0)
         except:
             pass
+            
+    result['total_images'] = total_images
     
     return jsonify(result), 200
 

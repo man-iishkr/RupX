@@ -1,8 +1,4 @@
-import eventlet
-eventlet.monkey_patch(os=False, thread=False) # Important: don't patch thread
-
 from flask import Flask, request, jsonify, session, send_file
-from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import os
 import secrets
@@ -30,21 +26,6 @@ CORS(app,
      allow_headers=['Content-Type', 'Authorization'],
      expose_headers=['Content-Type'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
-
-# Initialize SocketIO with optimized settings
-socketio = SocketIO(
-    app, 
-    cors_allowed_origins=[
-        'http://127.0.0.1:8080', 
-        'http://localhost:8080',
-        'https://rupx-backend.onrender.com',
-        'https://rupx.netlify.app'
-    ], 
-    async_mode='eventlet',
-    ping_timeout=120,          # Increased timeout
-    ping_interval=25,
-    max_http_buffer_size=10 * 1024 * 1024  # 10MB buffer
-)
 
 # Create storage directories
 os.makedirs('storage/users', exist_ok=True)
@@ -152,11 +133,7 @@ app.register_blueprint(recognize.bp, url_prefix='/api/recognize')
 app.register_blueprint(attendance.bp, url_prefix='/api/attendance')
 
 # Import WebSocket handlers (only if needed)
-try:
-    from websocket import video_stream
-    video_stream.init_socketio(socketio)
-except ImportError:
-    print("⚠️  WebSocket module not found, skipping video stream")
+# REPLACED: video_stream is no longer needed, using REST API instead.
 
 # Error handlers
 @app.errorhandler(404)
@@ -207,17 +184,9 @@ if __name__ == '__main__':
     print("=" * 60)
     print(f"Database: {DB_TYPE.upper()}")
     print("Server: http://0.0.0.0:5000")
-    print("WebSocket: ws://0.0.0.0:5000/socket.io")
-    print("=" * 60)
-    
-    # Get port from environment
-    port = int(os.environ.get('PORT', 5000))
-    
-    # Run with SocketIO
-    socketio.run(
-        app, 
+    # Run standard Flask app (for local dev, production uses gunicorn)
+    app.run(
         host='0.0.0.0',
         port=port, 
-        debug=False,  # NEVER True in production
-        allow_unsafe_werkzeug=True
+        debug=False
     )
